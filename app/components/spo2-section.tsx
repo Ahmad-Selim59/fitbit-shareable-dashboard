@@ -38,8 +38,8 @@ export function SpO2Section({ days }: { days: SpO2DayView[] }) {
 
       {days.length === 0 ? (
         <p className="rounded-lg border border-dashed border-zinc-300 px-4 py-6 text-sm text-zinc-500 dark:border-zinc-700">
-          No SpO₂ data returned. Enable blood oxygen on your Fitbit and ensure
-          the health metrics scope was granted when you connected.
+          No SpO₂ data returned. Enable blood oxygen on your device and ensure
+          the health metrics scope was granted during owner setup.
         </p>
       ) : (
         <div className="overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800">

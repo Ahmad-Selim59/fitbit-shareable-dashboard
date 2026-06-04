@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
   const error = searchParams.get("error");
 
   const appUrl = getAppUrl();
-  const home = new URL("/", appUrl);
+  const home = new URL("/setup", appUrl);
 
   if (error) {
     home.searchParams.set("error", error);

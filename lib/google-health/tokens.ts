@@ -1,3 +1,4 @@
+import { getEnvRefreshToken } from "./config";
 import { mkdir, readFile, writeFile } from "fs/promises";
 import path from "path";
 
@@ -40,4 +41,16 @@ export async function clearTokens(): Promise<void> {
 
 export function isTokenExpired(tokens: GoogleHealthTokens): boolean {
   return Date.now() >= tokens.expiresAt - 60_000;
+}
+
+/** Refresh token from .env (deploy) or saved file (local one-time /setup). */
+export async function getConfiguredRefreshToken(): Promise<string | null> {
+  const fromEnv = getEnvRefreshToken();
+  if (fromEnv) return fromEnv;
+  const fromFile = await loadTokens();
+  return fromFile?.refreshToken ?? null;
+}
+
+export async function hasRefreshTokenConfigured(): Promise<boolean> {
+  return (await getConfiguredRefreshToken()) !== null;
 }

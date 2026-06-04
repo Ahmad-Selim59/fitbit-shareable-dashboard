@@ -21,9 +21,11 @@ cp env.example .env.local
 pnpm dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) → **Connect Google Health**.
+6. **One-time owner setup:** open [http://localhost:3000/setup](http://localhost:3000/setup) and authorize **your** Google account (you may see Fitbit mentioned on Google’s consent screen — that is expected).
 
-Tokens are stored in `.data/google-health-tokens.json` (gitignored).
+7. Open [http://localhost:3000](http://localhost:3000) — your data loads with **no sign-in** for you or visitors.
+
+Tokens are stored in `.data/google-health-tokens.json` (gitignored). Client ID/secret alone are not enough; you must complete step 6 once to obtain a refresh token.
 
 **Note:** In Testing mode, refresh tokens may expire after 7 days — reconnect if data stops loading.
 

@@ -1,6 +1,7 @@
 import { GOOGLE_REVOKE_URL, HEALTH_API_BASE } from "./config";
 import { refreshAccessToken } from "./oauth";
 import {
+  getConfiguredRefreshToken,
   isTokenExpired,
   loadTokens,
   saveTokens,
@@ -8,21 +9,26 @@ import {
 } from "./tokens";
 
 async function getValidTokens(): Promise<GoogleHealthTokens | null> {
-  const tokens = await loadTokens();
-  if (!tokens) return null;
+  const refreshToken = await getConfiguredRefreshToken();
+  if (!refreshToken) return null;
 
-  if (!isTokenExpired(tokens)) {
-    return tokens;
+  const cached = await loadTokens();
+  if (
+    cached?.refreshToken === refreshToken &&
+    !isTokenExpired(cached)
+  ) {
+    return cached;
   }
 
   try {
-    return await refreshAccessToken(tokens.refreshToken);
+    return await refreshAccessToken(refreshToken);
   } catch {
     return null;
   }
 }
 
 export async function isGoogleHealthConnected(): Promise<boolean> {
+  if (!(await getConfiguredRefreshToken())) return false;
   const tokens = await getValidTokens();
   return tokens !== null;
 }
