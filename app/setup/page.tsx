@@ -1,4 +1,5 @@
 import { ConnectGoogle } from "../components/connect-google";
+import { CopyRefreshToken } from "../components/copy-refresh-token";
 import { isGoogleHealthConnected } from "@/lib/google-health/client";
 import { getEnvRefreshToken } from "@/lib/google-health/config";
 import { loadTokens } from "@/lib/google-health/tokens";
@@ -52,16 +53,10 @@ export default async function SetupPage({
               </a>
               .
             </p>
-            {onVercel && !envRefresh && (
+            {onVercel && !envRefresh && fileTokens?.refreshToken && (
               <p className="text-xs">
-                To show data to <strong>all visitors</strong> (not only this
-                browser), run <code className="rounded bg-teal-100 px-1">/setup</code>{" "}
-                locally once, copy{" "}
-                <code className="rounded bg-teal-100 px-1">refreshToken</code> from{" "}
-                <code className="rounded bg-teal-100 px-1">.data/google-health-tokens.json</code>{" "}
-                into Vercel as{" "}
-                <code className="rounded bg-teal-100 px-1">GOOGLE_REFRESH_TOKEN</code>, then
-                redeploy.
+                One more step below so everyone can view the dashboard (not just
+                this browser).
               </p>
             )}
           </div>
@@ -109,20 +104,14 @@ export default async function SetupPage({
           </div>
         </div>
 
-        {envRefresh && (
-          <p className="text-xs text-zinc-500">
-            GOOGLE_REFRESH_TOKEN is set in .env — it takes priority over the
-            saved file.
-          </p>
+        {onVercel && fileTokens?.refreshToken && !envRefresh && (
+          <CopyRefreshToken refreshToken={fileTokens.refreshToken} />
         )}
 
-        {fileTokens?.refreshToken && !envRefresh && (
-          <p className="text-xs text-zinc-500">
-            Optional: copy the refresh token from the saved file into{" "}
-            <code className="rounded bg-zinc-100 px-1 dark:bg-zinc-900">
-              GOOGLE_REFRESH_TOKEN
-            </code>{" "}
-            in .env.local for production deploys.
+        {envRefresh && (
+          <p className="rounded-lg bg-teal-50 px-4 py-3 text-xs text-teal-800 dark:bg-teal-950 dark:text-teal-200">
+            GOOGLE_REFRESH_TOKEN is set on Vercel. The dashboard should work for
+            all visitors after your last deploy.
           </p>
         )}
 

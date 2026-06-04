@@ -36,6 +36,8 @@ Tokens are stored locally in `.data/google-health-tokens.json` (gitignored). On 
 
 Client ID/secret alone are not enough; complete owner `/setup` once to obtain a refresh token.
 
+**Vercel only (no local dev):** after Connect on `/setup`, copy the refresh token shown on that page → Vercel env `GOOGLE_REFRESH_TOKEN` → redeploy.
+
 **Note:** In Testing mode, refresh tokens may expire after 7 days — reconnect if data stops loading.
 
 ## Optional site password
