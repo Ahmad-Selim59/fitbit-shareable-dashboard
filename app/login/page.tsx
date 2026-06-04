@@ -45,6 +45,15 @@ export default async function LoginPage({
         <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
           Enter the password you set in DASHBOARD_PASSWORD.
         </p>
+        <p className="mt-3 rounded-lg bg-blue-50 px-3 py-2 text-xs text-blue-900 dark:bg-blue-950 dark:text-blue-200">
+          This is <strong>not</strong> Google or Fitbit login. Your laptop may
+          already have this cookie, which is why the dashboard works there but
+          not on your phone. Enter the site password once on each new device.
+          <code className="mt-1 block rounded bg-blue-100 px-1 dark:bg-blue-900">
+            /setup
+          </code>{" "}
+          is separate and does not use this password.
+        </p>
         <form action={loginAction} className="mt-6 space-y-4">
           <input
             type="password"

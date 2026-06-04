@@ -12,6 +12,7 @@ export function middleware(request: NextRequest) {
 
   if (
     pathname.startsWith("/api/auth/google") ||
+    pathname === "/api/health/status" ||
     pathname === "/setup" ||
     pathname === "/login" ||
     pathname.startsWith("/_next")

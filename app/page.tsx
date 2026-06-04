@@ -1,13 +1,14 @@
 import { HeartRateSection } from "./components/heart-rate-section";
 import { SleepSection } from "./components/sleep-section";
 import { SpO2Section } from "./components/spo2-section";
-import { isGoogleHealthConnected } from "@/lib/google-health/client";
+import { getConnectionStatus } from "@/lib/google-health/client";
 import { fetchDashboardData } from "@/lib/google-health/data";
 
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
-  const connected = await isGoogleHealthConnected();
+  const status = await getConnectionStatus();
+  const connected = status.working;
 
   return (
     <div className="min-h-full bg-zinc-50 dark:bg-zinc-950">
@@ -23,6 +24,17 @@ export default async function Home() {
       </header>
 
       <main className="mx-auto max-w-5xl space-y-10 px-4 py-8 sm:px-6">
+        {status.configured && !status.working && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-200">
+            Google token is configured but not working
+            {status.refreshError ? `: ${status.refreshError}` : ""}. Fix at{" "}
+            <a href="/setup" className="font-medium underline">
+              /setup
+            </a>
+            .
+          </div>
+        )}
+
         {!connected ? (
           <div className="rounded-2xl border border-amber-200 bg-amber-50 px-6 py-10 dark:border-amber-900 dark:bg-amber-950">
             <h2 className="text-lg font-medium text-amber-950 dark:text-amber-100">
