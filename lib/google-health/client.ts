@@ -85,12 +85,14 @@ export async function fetchAndStoreIdentity(): Promise<void> {
   });
 }
 
-export async function disconnectGoogleHealth(): Promise<void> {
-  const tokens = await loadTokens();
-  if (tokens?.refreshToken) {
+export async function disconnectGoogleHealth(): Promise<{
+  envTokenStillSet: boolean;
+}> {
+  const refreshToken = await getConfiguredRefreshToken();
+  if (refreshToken) {
     try {
       await fetch(
-        `${GOOGLE_REVOKE_URL}?token=${encodeURIComponent(tokens.refreshToken)}`,
+        `${GOOGLE_REVOKE_URL}?token=${encodeURIComponent(refreshToken)}`,
         { method: "POST" },
       );
     } catch {
@@ -99,4 +101,6 @@ export async function disconnectGoogleHealth(): Promise<void> {
   }
   const { clearTokens } = await import("./tokens");
   await clearTokens();
+  const { getEnvRefreshToken } = await import("./config");
+  return { envTokenStillSet: Boolean(getEnvRefreshToken()) };
 }

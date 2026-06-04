@@ -2,7 +2,7 @@ import { ConnectGoogle } from "../components/connect-google";
 import { CopyRefreshToken } from "../components/copy-refresh-token";
 import { isGoogleHealthConnected } from "@/lib/google-health/client";
 import { getEnvRefreshToken } from "@/lib/google-health/config";
-import { loadTokens } from "@/lib/google-health/tokens";
+import { hasRefreshTokenConfigured, loadTokens } from "@/lib/google-health/tokens";
 
 export const dynamic = "force-dynamic";
 
@@ -26,7 +26,8 @@ export default async function SetupPage({
 }) {
   const params = await searchParams;
   const onVercel = process.env.VERCEL === "1";
-  const connected = await isGoogleHealthConnected();
+  const configured = await hasRefreshTokenConfigured();
+  const working = await isGoogleHealthConnected();
   const envRefresh = getEnvRefreshToken();
   const fileTokens = await loadTokens();
 
@@ -92,8 +93,12 @@ export default async function SetupPage({
           </p>
 
           <div className="mt-6 flex flex-wrap items-center gap-3">
-            <ConnectGoogle connected={connected} />
-            {connected && (
+            <ConnectGoogle
+              configured={configured}
+              working={working}
+              envTokenSet={Boolean(envRefresh)}
+            />
+            {working && (
               <a
                 href="/"
                 className="text-sm font-medium text-teal-600 hover:text-teal-500"
@@ -107,7 +112,7 @@ export default async function SetupPage({
         {onVercel &&
           fileTokens?.refreshToken &&
           !envRefresh &&
-          (params.connected === "1" || connected) && (
+          (params.connected === "1" || working) && (
             <CopyRefreshToken refreshToken={fileTokens.refreshToken} />
           )}
 
@@ -118,12 +123,11 @@ export default async function SetupPage({
               because you already added it. Redeploy after any env change.
             </p>
             <p>
-              If the dashboard still errors, disconnect below, connect again,
-              and copy the new token over the old env value (or remove{" "}
+              Use <strong>Disconnect</strong> above, delete{" "}
               <code className="rounded bg-teal-100 px-1 dark:bg-teal-900">
                 GOOGLE_REFRESH_TOKEN
               </code>{" "}
-              temporarily to see the copy box again).
+              in Vercel, redeploy, then connect again to get a fresh token.
             </p>
           </div>
         )}
