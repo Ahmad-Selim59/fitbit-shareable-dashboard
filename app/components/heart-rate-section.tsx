@@ -1,4 +1,5 @@
 import type { RestingHeartRateDay } from "@/lib/google-health/data";
+import { LiveHeartRate } from "./live-heart-rate";
 import { MetricCard } from "./metric-card";
 
 function formatDateLabel(date: string): string {
@@ -18,13 +19,16 @@ export function HeartRateSection({
   const latest = days[0];
 
   return (
-    <section className="space-y-4">
+    <section className="space-y-8">
+      <LiveHeartRate />
+
+      <div className="space-y-4">
       <div>
         <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-          Heart rate
+          Resting heart rate (daily)
         </h2>
         <p className="text-sm text-zinc-600 dark:text-zinc-400">
-          Daily resting heart rate (last 7 days)
+          One resting value per day (last 7 days)
         </p>
       </div>
 
@@ -60,6 +64,7 @@ export function HeartRateSection({
           </table>
         </div>
       )}
+      </div>
     </section>
   );
 }
