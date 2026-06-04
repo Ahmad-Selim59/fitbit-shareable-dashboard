@@ -1,4 +1,9 @@
 import { healthFetch } from "./client";
+import {
+  bucketSecondsForSpan,
+  downsampleHeartRate,
+  samplesInWindow,
+} from "./downsample";
 
 type HeartRatePoint = {
   heartRate?: {
@@ -19,11 +24,15 @@ export type LiveHeartRateSample = {
 
 export type LiveHeartRateData = {
   latest: LiveHeartRateSample | null;
-  recentSamples: LiveHeartRateSample[];
+  /** Downsampled series for the trend chart */
+  chartSamples: LiveHeartRateSample[];
+  chartBucketSeconds: number;
   fetchedAt: string;
 };
 
 const WINDOW_HOURS = 6;
+const CHART_WINDOW_MS = 2 * 60 * 60 * 1000; // last 2 hours on the chart
+const CHART_TARGET_BARS = 80;
 const PAGE_SIZE = 500;
 const MAX_PAGES = 3;
 
@@ -61,10 +70,15 @@ export async function fetchLiveHeartRate(): Promise<LiveHeartRateData> {
   } while (pageToken && pages < MAX_PAGES);
 
   samples.sort((a, b) => b.at.localeCompare(a.at));
+  const chronological = [...samples].reverse();
+  const windowed = samplesInWindow(chronological, CHART_WINDOW_MS);
+  const bucketSec = bucketSecondsForSpan(CHART_WINDOW_MS, CHART_TARGET_BARS);
+  const chartSamples = downsampleHeartRate(windowed, bucketSec);
 
   return {
     latest: samples[0] ?? null,
-    recentSamples: samples.slice(0, 180).reverse(),
+    chartSamples,
+    chartBucketSeconds: bucketSec,
     fetchedAt: new Date().toISOString(),
   };
 }

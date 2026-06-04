@@ -9,7 +9,6 @@ function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString(undefined, {
     hour: "numeric",
     minute: "2-digit",
-    second: "2-digit",
   });
 }
 
@@ -50,9 +49,11 @@ export function LiveHeartRate() {
     return () => clearInterval(id);
   }, [load]);
 
-  const maxBpm =
-    data?.recentSamples.length &&
-    Math.max(...data.recentSamples.map((s) => s.bpm));
+  const chart = data?.chartSamples ?? [];
+  const bpms = chart.map((s) => s.bpm);
+  const minBpm = bpms.length ? Math.min(...bpms) : 0;
+  const maxBpm = bpms.length ? Math.max(...bpms) : 0;
+  const bpmRange = Math.max(maxBpm - minBpm, 12);
 
   return (
     <div className="rounded-2xl border border-teal-200 bg-gradient-to-br from-teal-50 to-white p-6 dark:border-teal-900 dark:from-teal-950 dark:to-zinc-950">
@@ -99,27 +100,44 @@ export function LiveHeartRate() {
         </p>
       )}
 
-      {data && data.recentSamples.length > 1 && maxBpm && (
+      {chart.length > 1 && (
         <div className="mt-6">
-          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-zinc-500">
-            Recent (last {data.recentSamples.length} samples)
-          </p>
-          <div className="flex h-16 items-end gap-px overflow-hidden rounded-lg bg-zinc-100 p-1 dark:bg-zinc-900">
-            {data.recentSamples.map((s) => (
-              <div
-                key={s.at}
-                className="min-w-[2px] flex-1 rounded-sm bg-teal-500/80 dark:bg-teal-400/80"
-                style={{ height: `${Math.max(8, (s.bpm / maxBpm) * 100)}%` }}
-                title={`${s.bpm} bpm at ${formatTime(s.at)}`}
-              />
-            ))}
+          <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+            <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+              Trend (last ~2 hours)
+            </p>
+            <p className="text-xs text-zinc-500">
+              Each bar ≈ {data?.chartBucketSeconds ?? 40}s average · {chart.length}{" "}
+              points
+            </p>
           </div>
+          <div className="flex gap-1">
+            <div className="flex w-8 shrink-0 flex-col justify-between py-1 text-right text-[10px] tabular-nums text-zinc-400">
+              <span>{maxBpm}</span>
+              <span>{minBpm}</span>
+            </div>
+            <div className="flex h-28 min-w-0 flex-1 items-end gap-0.5 overflow-hidden rounded-lg bg-zinc-100 p-2 dark:bg-zinc-900">
+              {chart.map((s) => {
+                const pct = ((s.bpm - minBpm) / bpmRange) * 100;
+                return (
+                  <div
+                    key={s.at}
+                    className="min-w-[3px] max-w-[12px] flex-1 rounded-sm bg-teal-600 dark:bg-teal-400"
+                    style={{ height: `${Math.max(6, pct)}%` }}
+                    title={`${s.bpm} bpm (~${data?.chartBucketSeconds}s avg) · ${formatTime(s.at)}`}
+                  />
+                );
+              })}
+            </div>
+          </div>
+          <p className="mt-1 text-[10px] text-zinc-400">Older ← → now</p>
         </div>
       )}
 
       <p className="mt-4 text-xs text-zinc-500">
-        Not true real-time: updates when your device syncs to Google Health
-        (often every few minutes). This page re-fetches from the API every 60s.
+        Chart uses ~{data?.chartBucketSeconds ?? 40}s averages (not every raw
+        reading) so drops like 120→80 are easier to see. Data still only updates when
+        your watch syncs to Google Health.
       </p>
     </div>
   );
