@@ -6,6 +6,17 @@ import { exchangeCodeForTokens } from "@/lib/google-health/oauth";
 
 const STATE_COOKIE = "google_oauth_state";
 
+function redirectToSetup(
+  appUrl: string,
+  params: Record<string, string>,
+): NextResponse {
+  const url = new URL("/setup", appUrl);
+  for (const [key, value] of Object.entries(params)) {
+    url.searchParams.set(key, value);
+  }
+  return NextResponse.redirect(url);
+}
+
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
   const code = searchParams.get("code");
@@ -13,11 +24,9 @@ export async function GET(request: NextRequest) {
   const error = searchParams.get("error");
 
   const appUrl = getAppUrl();
-  const home = new URL("/setup", appUrl);
 
   if (error) {
-    home.searchParams.set("error", error);
-    return NextResponse.redirect(home);
+    return redirectToSetup(appUrl, { error });
   }
 
   const cookieStore = await cookies();
@@ -25,17 +34,23 @@ export async function GET(request: NextRequest) {
   cookieStore.delete(STATE_COOKIE);
 
   if (!code || !state || !savedState || state !== savedState) {
-    home.searchParams.set("error", "invalid_oauth_state");
-    return NextResponse.redirect(home);
+    return redirectToSetup(appUrl, { error: "invalid_oauth_state" });
   }
 
   try {
     await exchangeCodeForTokens(code);
-    await fetchAndStoreIdentity();
-    home.searchParams.set("connected", "1");
-  } catch {
-    home.searchParams.set("error", "token_exchange_failed");
+    try {
+      await fetchAndStoreIdentity();
+    } catch {
+      // identity is optional; tokens are enough for health data
+    }
+    return redirectToSetup(appUrl, { connected: "1" });
+  } catch (err) {
+    const detail =
+      err instanceof Error ? err.message : "Unknown token exchange error";
+    return redirectToSetup(appUrl, {
+      error: "token_exchange_failed",
+      detail: detail.slice(0, 300),
+    });
   }
-
-  return NextResponse.redirect(home);
 }

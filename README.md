@@ -25,7 +25,16 @@ pnpm dev
 
 7. Open [http://localhost:3000](http://localhost:3000) — your data loads with **no sign-in** for you or visitors.
 
-Tokens are stored in `.data/google-health-tokens.json` (gitignored). Client ID/secret alone are not enough; you must complete step 6 once to obtain a refresh token.
+Tokens are stored locally in `.data/google-health-tokens.json` (gitignored). On **Vercel**, tokens are stored in an httpOnly cookie (the filesystem is read-only).
+
+**Vercel environment variables** (Settings → Environment Variables → redeploy):
+
+- `GOOGLE_CLIENT_ID`
+- `GOOGLE_CLIENT_SECRET`
+- `GOOGLE_REDIRECT_URI` = `https://YOUR-DOMAIN.vercel.app/api/auth/google/callback`
+- `NEXT_PUBLIC_APP_URL` = `https://YOUR-DOMAIN.vercel.app`
+
+Client ID/secret alone are not enough; complete owner `/setup` once to obtain a refresh token.
 
 **Note:** In Testing mode, refresh tokens may expire after 7 days — reconnect if data stops loading.
 

@@ -11,12 +11,20 @@ const ERROR_MESSAGES: Record<string, string> = {
   token_exchange_failed: "Could not exchange the authorization code.",
 };
 
+const VERCEL_HINTS: Record<string, string> = {
+  invalid_client:
+    "Check GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in Vercel env vars, then redeploy.",
+  redirect_uri_mismatch:
+    "GOOGLE_REDIRECT_URI in Vercel must exactly match Google Cloud redirect URI.",
+};
+
 export default async function SetupPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; connected?: string }>;
+  searchParams: Promise<{ error?: string; connected?: string; detail?: string }>;
 }) {
   const params = await searchParams;
+  const onVercel = process.env.VERCEL === "1";
   const connected = await isGoogleHealthConnected();
   const envRefresh = getEnvRefreshToken();
   const fileTokens = await loadTokens();
@@ -36,28 +44,55 @@ export default async function SetupPage({
 
       <main className="mx-auto max-w-lg space-y-6 px-4 py-8 sm:px-6">
         {params.connected === "1" && (
-          <p className="rounded-lg bg-teal-50 px-4 py-3 text-sm text-teal-800 dark:bg-teal-950 dark:text-teal-200">
-            Connected. Open the{" "}
-            <a href="/" className="font-medium underline">
-              dashboard
-            </a>{" "}
-            — your data should load with no sign-in.
-          </p>
+          <div className="space-y-2 rounded-lg bg-teal-50 px-4 py-3 text-sm text-teal-800 dark:bg-teal-950 dark:text-teal-200">
+            <p>
+              Connected. Open the{" "}
+              <a href="/" className="font-medium underline">
+                dashboard
+              </a>
+              .
+            </p>
+            {onVercel && !envRefresh && (
+              <p className="text-xs">
+                To show data to <strong>all visitors</strong> (not only this
+                browser), run <code className="rounded bg-teal-100 px-1">/setup</code>{" "}
+                locally once, copy{" "}
+                <code className="rounded bg-teal-100 px-1">refreshToken</code> from{" "}
+                <code className="rounded bg-teal-100 px-1">.data/google-health-tokens.json</code>{" "}
+                into Vercel as{" "}
+                <code className="rounded bg-teal-100 px-1">GOOGLE_REFRESH_TOKEN</code>, then
+                redeploy.
+              </p>
+            )}
+          </div>
         )}
         {params.error && (
-          <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-800 dark:bg-red-950 dark:text-red-200">
-            {ERROR_MESSAGES[params.error] ?? `Error: ${params.error}`}
-          </p>
+          <div className="space-y-2 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-800 dark:bg-red-950 dark:text-red-200">
+            <p>{ERROR_MESSAGES[params.error] ?? `Error: ${params.error}`}</p>
+            {params.detail && (
+              <p className="break-all font-mono text-xs opacity-90">
+                {params.detail}
+              </p>
+            )}
+            {params.detail &&
+              Object.entries(VERCEL_HINTS).map(([key, hint]) =>
+                params.detail!.includes(key) ? (
+                  <p key={key} className="text-xs">
+                    {hint}
+                  </p>
+                ) : null,
+              )}
+          </div>
         )}
 
         <div className="rounded-2xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-950">
           <p className="text-sm text-zinc-600 dark:text-zinc-400">
             Google may mention Fitbit on the consent screen — that is normal.
             You are authorizing <strong>your</strong> account once; the server
-            stores a refresh token in{" "}
-            <code className="rounded bg-zinc-100 px-1 text-xs dark:bg-zinc-900">
-              .data/google-health-tokens.json
-            </code>
+            stores tokens on the server
+            {onVercel
+              ? " (secure httpOnly cookie on Vercel — set GOOGLE_REFRESH_TOKEN in env for a permanent deploy)"
+              : " in .data/google-health-tokens.json locally"}
             .
           </p>
 
