@@ -33,6 +33,49 @@ export async function isGoogleHealthConnected(): Promise<boolean> {
   return tokens !== null;
 }
 
+export type ConnectionStatus = {
+  configured: boolean;
+  working: boolean;
+  tokenSource: "env" | "cookie" | "none";
+  dashboardPasswordRequired: boolean;
+  refreshError?: string;
+};
+
+/** For /setup diagnostics — does not expose secrets. */
+export async function getConnectionStatus(): Promise<ConnectionStatus> {
+  const { getEnvRefreshToken } = await import("./config");
+  const envRefresh = getEnvRefreshToken();
+  const stored = await loadTokens();
+  const configured = Boolean(envRefresh || stored?.refreshToken);
+
+  let working = false;
+  let refreshError: string | undefined;
+
+  if (configured) {
+    working = (await getValidTokens()) !== null;
+    if (!working) {
+      const refreshToken = await getConfiguredRefreshToken();
+      if (refreshToken) {
+        try {
+          await refreshAccessToken(refreshToken);
+          working = true;
+        } catch (err) {
+          refreshError =
+            err instanceof Error ? err.message : "Token refresh failed";
+        }
+      }
+    }
+  }
+
+  return {
+    configured,
+    working,
+    tokenSource: envRefresh ? "env" : stored?.refreshToken ? "cookie" : "none",
+    dashboardPasswordRequired: Boolean(process.env.DASHBOARD_PASSWORD),
+    refreshError,
+  };
+}
+
 export async function healthFetch<T>(path: string): Promise<T> {
   let tokens = await getValidTokens();
   if (!tokens) {

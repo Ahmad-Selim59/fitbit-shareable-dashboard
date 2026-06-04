@@ -24,7 +24,15 @@ export function getAppUrl(): string {
 
 /** Optional: set after one-time /setup so the dashboard never prompts visitors to sign in. */
 export function getEnvRefreshToken(): string | undefined {
-  const value = process.env.GOOGLE_REFRESH_TOKEN?.trim();
+  let value = process.env.GOOGLE_REFRESH_TOKEN?.trim();
+  if (!value) return undefined;
+  // Strip accidental quotes from copy-paste into Vercel
+  if (
+    (value.startsWith('"') && value.endsWith('"')) ||
+    (value.startsWith("'") && value.endsWith("'"))
+  ) {
+    value = value.slice(1, -1).trim();
+  }
   return value || undefined;
 }
 

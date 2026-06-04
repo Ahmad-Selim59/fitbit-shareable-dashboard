@@ -1,8 +1,11 @@
 import { ConnectGoogle } from "../components/connect-google";
 import { CopyRefreshToken } from "../components/copy-refresh-token";
-import { isGoogleHealthConnected } from "@/lib/google-health/client";
+import {
+  getConnectionStatus,
+  isGoogleHealthConnected,
+} from "@/lib/google-health/client";
 import { getEnvRefreshToken } from "@/lib/google-health/config";
-import { hasRefreshTokenConfigured, loadTokens } from "@/lib/google-health/tokens";
+import { loadTokens } from "@/lib/google-health/tokens";
 
 export const dynamic = "force-dynamic";
 
@@ -26,7 +29,8 @@ export default async function SetupPage({
 }) {
   const params = await searchParams;
   const onVercel = process.env.VERCEL === "1";
-  const configured = await hasRefreshTokenConfigured();
+  const status = await getConnectionStatus();
+  const configured = status.configured;
   const working = await isGoogleHealthConnected();
   const envRefresh = getEnvRefreshToken();
   const fileTokens = await loadTokens();
@@ -80,6 +84,36 @@ export default async function SetupPage({
               )}
           </div>
         )}
+
+        <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4 text-xs text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
+          <p className="font-medium text-zinc-800 dark:text-zinc-200">
+            Connection check (for all visitors)
+          </p>
+          <ul className="mt-2 list-inside list-disc space-y-1">
+            <li>
+              Token source: <strong>{status.tokenSource}</strong>
+              {status.tokenSource === "env"
+                ? " — correct for phones/other browsers"
+                : status.tokenSource === "cookie"
+                  ? " — only this browser; add GOOGLE_REFRESH_TOKEN in Vercel"
+                  : ""}
+            </li>
+            <li>
+              API access:{" "}
+              <strong>{status.working ? "working" : "not working"}</strong>
+            </li>
+            {status.dashboardPasswordRequired && (
+              <li>
+                DASHBOARD_PASSWORD is on — other devices must use /login first
+              </li>
+            )}
+            {status.refreshError && (
+              <li className="break-all text-amber-700 dark:text-amber-300">
+                {status.refreshError}
+              </li>
+            )}
+          </ul>
+        </div>
 
         <div className="rounded-2xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-950">
           <p className="text-sm text-zinc-600 dark:text-zinc-400">
