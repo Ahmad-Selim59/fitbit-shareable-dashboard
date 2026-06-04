@@ -34,14 +34,20 @@ async function loadFromCookie(): Promise<GoogleHealthTokens | null> {
 }
 
 async function saveToCookie(tokens: GoogleHealthTokens): Promise<void> {
-  const cookieStore = await cookies();
-  cookieStore.set(TOKEN_COOKIE, JSON.stringify(tokens), {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    maxAge: 60 * 60 * 24 * 400,
-    path: "/",
-  });
+  try {
+    const cookieStore = await cookies();
+    cookieStore.set(TOKEN_COOKIE, JSON.stringify(tokens), {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 60 * 60 * 24 * 400,
+      path: "/",
+    });
+  } catch (err) {
+    // Next.js throws if setting cookies in a Server Component.
+    // For the public dashboard, we can just ignore this — it will re-fetch the access token if needed.
+    console.warn("[google-health] Could not save token to cookie (Server Component context).");
+  }
 }
 
 async function clearCookie(): Promise<void> {
@@ -53,20 +59,32 @@ async function clearCookie(): Promise<void> {
   }
 }
 
+let globalTokenCache: GoogleHealthTokens | null = null;
+
 export async function loadTokens(): Promise<GoogleHealthTokens | null> {
+  if (globalTokenCache) {
+    return globalTokenCache;
+  }
+
   if (useCookieStorage()) {
-    return loadFromCookie();
+    const cookieTokens = await loadFromCookie();
+    if (cookieTokens) globalTokenCache = cookieTokens;
+    return cookieTokens;
   }
 
   try {
     const raw = await readFile(TOKEN_FILE, "utf8");
-    return JSON.parse(raw) as GoogleHealthTokens;
+    const parsed = JSON.parse(raw) as GoogleHealthTokens;
+    globalTokenCache = parsed;
+    return parsed;
   } catch {
     return null;
   }
 }
 
 export async function saveTokens(tokens: GoogleHealthTokens): Promise<void> {
+  globalTokenCache = tokens;
+
   if (useCookieStorage()) {
     await saveToCookie(tokens);
     return;
@@ -77,6 +95,7 @@ export async function saveTokens(tokens: GoogleHealthTokens): Promise<void> {
 }
 
 export async function clearTokens(): Promise<void> {
+  globalTokenCache = null;
   await clearCookie();
   try {
     const { unlink } = await import("fs/promises");
