@@ -104,15 +104,28 @@ export default async function SetupPage({
           </div>
         </div>
 
-        {onVercel && fileTokens?.refreshToken && !envRefresh && (
-          <CopyRefreshToken refreshToken={fileTokens.refreshToken} />
-        )}
+        {onVercel &&
+          fileTokens?.refreshToken &&
+          !envRefresh &&
+          (params.connected === "1" || connected) && (
+            <CopyRefreshToken refreshToken={fileTokens.refreshToken} />
+          )}
 
         {envRefresh && (
-          <p className="rounded-lg bg-teal-50 px-4 py-3 text-xs text-teal-800 dark:bg-teal-950 dark:text-teal-200">
-            GOOGLE_REFRESH_TOKEN is set on Vercel. The dashboard should work for
-            all visitors after your last deploy.
-          </p>
+          <div className="space-y-2 rounded-lg bg-teal-50 px-4 py-3 text-xs text-teal-800 dark:bg-teal-950 dark:text-teal-200">
+            <p>
+              GOOGLE_REFRESH_TOKEN is set on Vercel — the copy box is hidden
+              because you already added it. Redeploy after any env change.
+            </p>
+            <p>
+              If the dashboard still errors, disconnect below, connect again,
+              and copy the new token over the old env value (or remove{" "}
+              <code className="rounded bg-teal-100 px-1 dark:bg-teal-900">
+                GOOGLE_REFRESH_TOKEN
+              </code>{" "}
+              temporarily to see the copy box again).
+            </p>
+          </div>
         )}
 
         <p className="text-xs text-zinc-500">

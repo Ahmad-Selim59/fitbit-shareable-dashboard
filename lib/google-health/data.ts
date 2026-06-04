@@ -190,20 +190,37 @@ function normalizeSpO2(points: DataPoint[]): SpO2DayView[] {
     .sort((a, b) => b.date.localeCompare(a.date));
 }
 
+async function fetchSafe(
+  label: string,
+  fn: () => Promise<DataPoint[]>,
+): Promise<DataPoint[]> {
+  try {
+    return await fn();
+  } catch (err) {
+    console.error(`[google-health] ${label}:`, err);
+    return [];
+  }
+}
+
 export async function fetchDashboardData(
   days = 7,
 ): Promise<DashboardData> {
   const range = queryDateRange(days);
 
-  const restingFilter = `dailyRestingHeartRate.date >= "${range.start}" AND dailyRestingHeartRate.date < "${range.endExclusive}"`;
+  // Filter fields use snake_case (see https://developers.google.com/health/endpoints)
+  const restingFilter = `daily_resting_heart_rate.date >= "${range.start}" AND daily_resting_heart_rate.date < "${range.endExclusive}"`;
   const sleepFilter = `sleep.interval.civil_end_time >= "${range.start}" AND sleep.interval.civil_end_time < "${range.endExclusive}"`;
-  const spo2Filter = `dailyOxygenSaturation.date >= "${range.start}" AND dailyOxygenSaturation.date < "${range.endExclusive}"`;
+  const spo2Filter = `daily_oxygen_saturation.date >= "${range.start}" AND daily_oxygen_saturation.date < "${range.endExclusive}"`;
 
   const [restingRaw, sleepRaw, spo2Raw] = await Promise.all([
-    listAllDataPoints("daily-resting-heart-rate", restingFilter),
-    listAllDataPoints("sleep", sleepFilter, 25),
-    listAllDataPoints("daily-oxygen-saturation", spo2Filter).catch(
-      () => [] as DataPoint[],
+    fetchSafe("daily-resting-heart-rate", () =>
+      listAllDataPoints("daily-resting-heart-rate", restingFilter),
+    ),
+    fetchSafe("sleep", () =>
+      listAllDataPoints("sleep", sleepFilter, 25),
+    ),
+    fetchSafe("daily-oxygen-saturation", () =>
+      listAllDataPoints("daily-oxygen-saturation", spo2Filter),
     ),
   ]);
 
