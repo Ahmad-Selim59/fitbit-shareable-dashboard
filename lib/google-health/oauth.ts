@@ -45,18 +45,20 @@ export function buildAuthorizeUrl(state: string): string {
 
 function toStoredTokens(
   data: TokenResponse,
-  previous?: GoogleHealthTokens | null,
+  fallbackRefreshToken?: string,
+  healthUserId?: string,
 ): GoogleHealthTokens {
-  if (!data.refresh_token && !previous?.refreshToken) {
+  const rt = data.refresh_token || fallbackRefreshToken;
+  if (!rt) {
     throw new Error("No refresh token received. Try disconnecting and connecting again.");
   }
 
   return {
     accessToken: data.access_token,
-    refreshToken: data.refresh_token ?? previous!.refreshToken,
+    refreshToken: rt,
     expiresAt: Date.now() + data.expires_in * 1000,
     scope: data.scope,
-    healthUserId: previous?.healthUserId,
+    healthUserId,
   };
 }
 
@@ -72,7 +74,8 @@ export async function exchangeCodeForTokens(
   });
 
   const data = await fetchTokens(body);
-  const tokens = toStoredTokens(data, await loadTokens());
+  const previous = await loadTokens();
+  const tokens = toStoredTokens(data, previous?.refreshToken, previous?.healthUserId);
   await saveTokens(tokens);
   return tokens;
 }
@@ -89,7 +92,7 @@ export async function refreshAccessToken(
 
   const data = await fetchTokens(body);
   const previous = await loadTokens();
-  const tokens = toStoredTokens(data, previous);
+  const tokens = toStoredTokens(data, refreshToken, previous?.healthUserId);
   await saveTokens(tokens);
   return tokens;
 }
