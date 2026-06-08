@@ -99,6 +99,7 @@ function HeartRateChart({
   pinned,
   hoverCapable,
   viewMode,
+  syncAppHint,
   onPin,
   onHover,
   onHoverClear,
@@ -110,6 +111,7 @@ function HeartRateChart({
   pinned: LiveHeartRateSample | null;
   hoverCapable: boolean;
   viewMode: HeartRateViewMode;
+  syncAppHint: string;
   onPin: (s: LiveHeartRateSample) => void;
   onHover: (s: LiveHeartRateSample) => void;
   onHoverClear: () => void;
@@ -123,8 +125,7 @@ function HeartRateChart({
   if (chart.length <= 1) {
     return (
       <p className="mt-4 text-sm text-zinc-500">
-        Not enough samples in this period. Try another day or open the Fitbit app
-        to sync.
+        Not enough samples in this period. Try another day or {syncAppHint.toLowerCase()}.
       </p>
     );
   }
@@ -199,7 +200,11 @@ function HeartRateChart({
   );
 }
 
-export function LiveHeartRate() {
+export function LiveHeartRate({
+  syncAppHint = "Open the Google Health app to sync your watch",
+}: {
+  syncAppHint?: string;
+}) {
   const [data, setData] = useState<LiveHeartRateData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -451,8 +456,7 @@ export function LiveHeartRate() {
 
       {!loading && !error && !data?.latest && !data?.windowStats && (
         <p className="mt-6 text-sm text-zinc-500">
-          No heart rate samples in this period. Open the Fitbit app to sync your
-          watch, then try again.
+          No heart rate samples in this period. {syncAppHint}, then try again.
         </p>
       )}
 
@@ -596,6 +600,7 @@ export function LiveHeartRate() {
             pinned={pinned}
             hoverCapable={hoverCapable}
             viewMode={viewMode}
+            syncAppHint={syncAppHint}
             onPin={(s) => setPinned((prev) => (prev?.at === s.at ? null : s))}
             onHover={setHovered}
             onHoverClear={() => setHovered(null)}

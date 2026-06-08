@@ -34,7 +34,7 @@ export type DeviceFetchResult = {
 function normalizeDevice(raw: PairedDevice): DeviceStatus {
   const batteryLevel = raw.batteryLevel ?? raw.battery_level;
   return {
-    deviceName: raw.deviceVersion ?? raw.device_version ?? "Fitbit",
+    deviceName: raw.deviceVersion ?? raw.device_version ?? "Watch",
     batteryLevel: typeof batteryLevel === "number" ? batteryLevel : null,
     batteryStatus: raw.batteryStatus ?? raw.battery_status ?? null,
     lastSyncTime: raw.lastSyncTime ?? raw.last_sync_time ?? null,
@@ -63,7 +63,7 @@ export async function fetchDeviceStatus(): Promise<DeviceFetchResult> {
     const devices = res.pairedDevices ?? res.paired_devices ?? [];
     const picked = pickTracker(devices);
     if (!picked) {
-      return { device: null, error: "No paired Fitbit tracker found" };
+      return { device: null, error: "No paired tracker found" };
     }
     return { device: normalizeDevice(picked) };
   } catch (err) {

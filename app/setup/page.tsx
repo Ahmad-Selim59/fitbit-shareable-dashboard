@@ -1,11 +1,21 @@
+import { CapabilityProbe } from "../components/capability-probe";
 import { ConnectGoogle } from "../components/connect-google";
 import { CopyRefreshToken } from "../components/copy-refresh-token";
+import { SamsungSetupChecklist } from "../components/samsung-setup-checklist";
+import { WatchTypeSelector } from "../components/watch-type-selector";
 import {
   getConnectionStatus,
   isGoogleHealthConnected,
 } from "@/lib/google-health/client";
+import { probeDashboardCapabilities } from "@/lib/google-health/capabilities";
 import { getEnvRefreshToken } from "@/lib/google-health/config";
 import { loadTokens } from "@/lib/google-health/tokens";
+import { getEnvWatchType } from "@/lib/watch-config";
+import {
+  getWatchType,
+  loadWatchSettings,
+  updateCapabilities,
+} from "@/lib/watch-settings";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +44,15 @@ export default async function SetupPage({
   const working = await isGoogleHealthConnected();
   const envRefresh = getEnvRefreshToken();
   const fileTokens = await loadTokens();
+  const envWatchType = getEnvWatchType();
+
+  let watchSettings = await loadWatchSettings();
+  if (working && !watchSettings?.capabilitiesProbedAt) {
+    const capabilities = await probeDashboardCapabilities();
+    watchSettings = await updateCapabilities(capabilities);
+  }
+
+  const watchType = await getWatchType();
 
   return (
     <div className="min-h-full bg-zinc-50 dark:bg-zinc-950">
@@ -126,7 +145,7 @@ export default async function SetupPage({
             .
           </p>
           <p className="mt-3 text-xs text-zinc-500">
-            Steps need the activity scope; Fitbit battery needs the settings
+            Steps need the activity scope; watch battery needs the settings
             scope. Add both in Google Cloud → Data Access, then disconnect and
             connect again here.
           </p>
@@ -147,6 +166,20 @@ export default async function SetupPage({
             )}
           </div>
         </div>
+
+        {working && (
+          <div className="space-y-6 rounded-2xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-950">
+            <WatchTypeSelector
+              initial={watchType}
+              envLocked={Boolean(envWatchType)}
+            />
+            {watchType === "samsung" && <SamsungSetupChecklist />}
+            <CapabilityProbe
+              initial={watchSettings?.capabilities ?? null}
+              probedAt={watchSettings?.capabilitiesProbedAt}
+            />
+          </div>
+        )}
 
         {onVercel &&
           fileTokens?.refreshToken &&

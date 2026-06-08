@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { DeviceFetchResult, DeviceStatus } from "@/lib/google-health/device";
+import { deviceCardLabel, type WatchType } from "@/lib/watch-config";
 
 const POLL_MS = 60 * 60 * 1000;
 
@@ -63,8 +64,10 @@ function needsReauth(error?: string): boolean {
 
 export function DeviceBatteryCard({
   initial,
+  watchType = "fitbit",
 }: {
   initial: DeviceFetchResult;
+  watchType?: WatchType;
 }) {
   const [device, setDevice] = useState<DeviceStatus | null>(initial.device);
   const [error, setError] = useState<string | undefined>(initial.error);
@@ -107,7 +110,7 @@ export function DeviceBatteryCard({
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
           <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
-            Fitbit watch
+            {deviceCardLabel(watchType)}
           </p>
           {device ? (
             <>

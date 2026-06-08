@@ -5,6 +5,8 @@ import { getConnectionStatus } from "@/lib/google-health/client";
 import { fetchDashboardDataCached } from "@/lib/google-health/data";
 import { fetchDeviceStatusCached } from "@/lib/google-health/device";
 import { fetchStepsHistoryCached, fetchTodaySteps } from "@/lib/google-health/steps";
+import { resolveEffectiveCapabilities } from "@/lib/watch-config";
+import { getWatchType, loadWatchSettings } from "@/lib/watch-settings";
 
 export const dynamic = "force-dynamic";
 
@@ -63,12 +65,20 @@ export default async function Home() {
 
 async function DashboardContent() {
   try {
-    const [data, stepsHistory, todaySteps, deviceStatus] = await Promise.all([
-      fetchDashboardDataCached(7),
-      fetchStepsHistoryCached(7),
-      fetchTodaySteps(),
-      fetchDeviceStatusCached(),
-    ]);
+    const [data, stepsHistory, todaySteps, deviceStatus, watchType, watchSettings] =
+      await Promise.all([
+        fetchDashboardDataCached(7),
+        fetchStepsHistoryCached(7),
+        fetchTodaySteps(),
+        fetchDeviceStatusCached(),
+        getWatchType(),
+        loadWatchSettings(),
+      ]);
+
+    const capabilities = resolveEffectiveCapabilities({
+      watchType,
+      probed: watchSettings?.capabilities ?? null,
+    });
 
     const stepsError = todaySteps.error ?? stepsHistory.error;
 
@@ -77,15 +87,37 @@ async function DashboardContent() {
         <p className="text-sm text-zinc-500">
           Showing {data.range.start} → {data.range.end}
         </p>
-        <HeartRateSection
-          days={data.restingHeartRate}
-          stepsHistory={stepsHistory.days}
-          initialToday={todaySteps.today}
-          stepsError={stepsError}
-          deviceStatus={deviceStatus}
-        />
-        <SleepSection logs={data.sleep} />
-        <SpO2Section days={data.spo2} />
+        {(capabilities.restingHeartRate ||
+          capabilities.liveHeartRate ||
+          capabilities.steps ||
+          capabilities.deviceBattery) && (
+          <HeartRateSection
+            days={data.restingHeartRate}
+            stepsHistory={stepsHistory.days}
+            initialToday={todaySteps.today}
+            stepsError={stepsError}
+            deviceStatus={deviceStatus}
+            watchType={watchType}
+            showDeviceBattery={capabilities.deviceBattery}
+            showRestingHeartRate={capabilities.restingHeartRate}
+            showLiveHeartRate={capabilities.liveHeartRate}
+            showSteps={capabilities.steps}
+          />
+        )}
+        {capabilities.sleep && <SleepSection logs={data.sleep} />}
+        {capabilities.spo2 && <SpO2Section days={data.spo2} />}
+        {!Object.values(capabilities).some(Boolean) && (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 px-6 py-8 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200">
+            <p className="font-medium">No supported metrics found yet.</p>
+            <p className="mt-2">
+              Sync your watch, then run <strong>Re-check features</strong> at{" "}
+              <a href="/setup" className="font-medium underline">
+                /setup
+              </a>
+              .
+            </p>
+          </div>
+        )}
       </>
     );
   } catch (err) {
