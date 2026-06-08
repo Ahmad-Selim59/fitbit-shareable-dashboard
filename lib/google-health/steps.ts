@@ -1,5 +1,4 @@
 import { healthFetch } from "./client";
-import { CACHE_TTL, withCache } from "./cache";
 import { queryDateRange } from "./dates";
 
 type CivilDateTime = { date?: string };
@@ -51,6 +50,7 @@ async function fetchStepsRollup(days: number): Promise<StepsDay[]> {
   return normalizeStepsRollup(res.rollupDataPoints ?? []);
 }
 
+/** Always fetches fresh — not server-cached. */
 export async function fetchStepsDays(days = 7): Promise<StepsDay[]> {
   try {
     return await fetchStepsRollup(days);
@@ -60,17 +60,8 @@ export async function fetchStepsDays(days = 7): Promise<StepsDay[]> {
   }
 }
 
-export function fetchStepsDaysCached(days = 7): Promise<StepsDay[]> {
-  return withCache(`steps:${days}`, CACHE_TTL.dailyMs, () =>
-    fetchStepsDays(days),
-  );
-}
-
+/** Always fetches fresh — not server-cached. */
 export async function fetchTodaySteps(): Promise<StepsDay | null> {
   const days = await fetchStepsDays(1);
   return days[0] ?? null;
-}
-
-export function fetchTodayStepsCached(): Promise<StepsDay | null> {
-  return withCache("steps:today", CACHE_TTL.stepsMs, fetchTodaySteps);
 }

@@ -16,6 +16,27 @@ function formatDateLabel(date: string): string {
   });
 }
 
+function formatStages(stages: SleepLogView["stages"]): string {
+  const entries = (
+    [
+      { label: "Deep", mins: stages.deep },
+      { label: "Light", mins: stages.light },
+      { label: "REM", mins: stages.rem },
+      { label: "Wake", mins: stages.wake },
+    ] as const
+  ).filter((e) => e.mins != null && e.mins > 0);
+
+  const total = entries.reduce((sum, e) => sum + (e.mins ?? 0), 0);
+  if (total === 0) return "";
+
+  return entries
+    .map((e) => {
+      const pct = Math.round(((e.mins ?? 0) / total) * 100);
+      return `${e.label} ${e.mins}m (${pct}%)`;
+    })
+    .join(" · ");
+}
+
 export function SleepSection({ logs }: { logs: SleepLogView[] }) {
   const latest = logs[0];
   const withEfficiency = logs.filter((l) => l.efficiency != null);
@@ -34,7 +55,7 @@ export function SleepSection({ logs }: { logs: SleepLogView[] }) {
           Sleep
         </h2>
         <p className="text-sm text-zinc-600 dark:text-zinc-400">
-          Sleep sessions from the last 7 days
+          Sleep sessions from the last 7 days · stage % is share of that night
         </p>
       </div>
 
@@ -69,14 +90,7 @@ export function SleepSection({ logs }: { logs: SleepLogView[] }) {
             </thead>
             <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
               {logs.map((log) => {
-                const stages = [
-                  log.stages.deep != null && `Deep ${log.stages.deep}m`,
-                  log.stages.light != null && `Light ${log.stages.light}m`,
-                  log.stages.rem != null && `REM ${log.stages.rem}m`,
-                  log.stages.wake != null && `Wake ${log.stages.wake}m`,
-                ]
-                  .filter(Boolean)
-                  .join(" · ");
+                const stages = formatStages(log.stages);
 
                 return (
                   <tr

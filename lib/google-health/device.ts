@@ -73,6 +73,7 @@ export async function fetchDeviceStatus(): Promise<DeviceFetchResult> {
   }
 }
 
+/** Cached 1h on success only — errors/empty are not cached (see cache.ts). */
 export function fetchDeviceStatusCached(): Promise<DeviceFetchResult> {
   return withCache("device-status", CACHE_TTL.deviceMs, fetchDeviceStatus);
 }

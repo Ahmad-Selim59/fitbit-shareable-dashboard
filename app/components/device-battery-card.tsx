@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { DeviceFetchResult, DeviceStatus } from "@/lib/google-health/device";
 
-const POLL_MS = 10 * 60 * 1000;
+const POLL_MS = 60 * 60 * 1000;
 
 function formatAgo(iso: string): string {
   const sec = Math.round((Date.now() - new Date(iso).getTime()) / 1000);

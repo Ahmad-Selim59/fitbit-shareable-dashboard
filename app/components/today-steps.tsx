@@ -61,7 +61,7 @@ export function TodaySteps({
           Daily steps
         </h3>
         <p className="text-sm text-zinc-600 dark:text-zinc-400">
-          Today&apos;s total — refreshes every few minutes
+          Today&apos;s total — fetched fresh each load
         </p>
       </div>
 

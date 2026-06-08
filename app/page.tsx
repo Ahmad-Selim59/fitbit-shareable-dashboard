@@ -4,7 +4,7 @@ import { SpO2Section } from "./components/spo2-section";
 import { getConnectionStatus } from "@/lib/google-health/client";
 import { fetchDashboardDataCached } from "@/lib/google-health/data";
 import { fetchDeviceStatusCached } from "@/lib/google-health/device";
-import { fetchStepsDaysCached } from "@/lib/google-health/steps";
+import { fetchStepsDays } from "@/lib/google-health/steps";
 
 export const dynamic = "force-dynamic";
 
@@ -65,7 +65,7 @@ async function DashboardContent() {
   try {
     const [data, steps, deviceStatus] = await Promise.all([
       fetchDashboardDataCached(7),
-      fetchStepsDaysCached(7),
+      fetchStepsDays(7),
       fetchDeviceStatusCached(),
     ]);
 
