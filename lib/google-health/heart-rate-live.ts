@@ -4,6 +4,7 @@ import {
   downsampleHeartRate,
   samplesInWindow,
 } from "./downsample";
+import { CACHE_TTL, withCache } from "./cache";
 
 type HeartRatePoint = {
   heartRate?: {
@@ -81,4 +82,8 @@ export async function fetchLiveHeartRate(): Promise<LiveHeartRateData> {
     chartBucketSeconds: bucketSec,
     fetchedAt: new Date().toISOString(),
   };
+}
+
+export function fetchLiveHeartRateCached(): Promise<LiveHeartRateData> {
+  return withCache("live-hr", CACHE_TTL.liveHeartRateMs, fetchLiveHeartRate);
 }

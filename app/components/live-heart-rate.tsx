@@ -1,14 +1,18 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import type { LiveHeartRateData } from "@/lib/google-health/heart-rate-live";
+import type {
+  LiveHeartRateData,
+  LiveHeartRateSample,
+} from "@/lib/google-health/heart-rate-live";
 
 const POLL_MS = 60_000;
 
-function formatTime(iso: string): string {
+function formatTime(iso: string, withSeconds = false): string {
   return new Date(iso).toLocaleTimeString(undefined, {
     hour: "numeric",
     minute: "2-digit",
+    ...(withSeconds ? { second: "2-digit" } : {}),
   });
 }
 
@@ -19,10 +23,21 @@ function formatAgo(iso: string): string {
   return `${Math.floor(sec / 3600)}h ago`;
 }
 
+function formatDateTime(iso: string): string {
+  return new Date(iso).toLocaleString(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
 export function LiveHeartRate() {
   const [data, setData] = useState<LiveHeartRateData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [selected, setSelected] = useState<LiveHeartRateSample | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -54,6 +69,7 @@ export function LiveHeartRate() {
   const minBpm = bpms.length ? Math.min(...bpms) : 0;
   const maxBpm = bpms.length ? Math.max(...bpms) : 0;
   const bpmRange = Math.max(maxBpm - minBpm, 12);
+  const bucketSec = data?.chartBucketSeconds ?? 40;
 
   return (
     <div className="rounded-2xl border border-teal-200 bg-gradient-to-br from-teal-50 to-white p-6 dark:border-teal-900 dark:from-teal-950 dark:to-zinc-950">
@@ -88,7 +104,8 @@ export function LiveHeartRate() {
             <span className="ml-2 text-2xl font-normal text-zinc-500">bpm</span>
           </p>
           <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-            Last sample {formatTime(data.latest.at)} ({formatAgo(data.latest.at)})
+            Last sample {formatTime(data.latest.at, true)} (
+            {formatAgo(data.latest.at)})
           </p>
         </div>
       )}
@@ -107,8 +124,7 @@ export function LiveHeartRate() {
               Trend (last ~2 hours)
             </p>
             <p className="text-xs text-zinc-500">
-              Each bar ≈ {data?.chartBucketSeconds ?? 40}s average · {chart.length}{" "}
-              points
+              Tap a bar for details · ~{bucketSec}s average · {chart.length} points
             </p>
           </div>
           <div className="flex gap-1">
@@ -116,28 +132,62 @@ export function LiveHeartRate() {
               <span>{maxBpm}</span>
               <span>{minBpm}</span>
             </div>
-            <div className="flex h-28 min-w-0 flex-1 items-end gap-0.5 overflow-hidden rounded-lg bg-zinc-100 p-2 dark:bg-zinc-900">
+            <div
+              className="flex h-28 min-w-0 flex-1 items-end gap-0.5 overflow-hidden rounded-lg bg-zinc-100 p-2 dark:bg-zinc-900"
+              role="list"
+              aria-label="Heart rate trend chart"
+            >
               {chart.map((s) => {
                 const pct = ((s.bpm - minBpm) / bpmRange) * 100;
+                const isSelected = selected?.at === s.at;
                 return (
-                  <div
+                  <button
                     key={s.at}
-                    className="min-w-[3px] max-w-[12px] flex-1 rounded-sm bg-teal-600 dark:bg-teal-400"
+                    type="button"
+                    role="listitem"
+                    aria-label={`${s.bpm} beats per minute around ${formatTime(s.at, true)}`}
+                    aria-pressed={isSelected}
+                    onClick={() =>
+                      setSelected((prev) => (prev?.at === s.at ? null : s))
+                    }
+                    onMouseEnter={() => setSelected(s)}
+                    className={`min-h-[44px] min-w-[3px] max-w-[12px] flex-1 self-end rounded-sm transition-colors touch-manipulation ${
+                      isSelected
+                        ? "bg-teal-800 ring-2 ring-teal-400 ring-offset-1 dark:bg-teal-300 dark:ring-teal-600"
+                        : "bg-teal-600 hover:bg-teal-500 dark:bg-teal-400 dark:hover:bg-teal-300"
+                    }`}
                     style={{ height: `${Math.max(6, pct)}%` }}
-                    title={`${s.bpm} bpm (~${data?.chartBucketSeconds}s avg) · ${formatTime(s.at)}`}
                   />
                 );
               })}
             </div>
           </div>
           <p className="mt-1 text-[10px] text-zinc-400">Older ← → now</p>
+
+          {selected ? (
+            <div className="mt-3 rounded-lg border border-teal-200 bg-white px-4 py-3 dark:border-teal-800 dark:bg-zinc-950">
+              <p className="text-lg font-semibold tabular-nums text-teal-700 dark:text-teal-300">
+                {selected.bpm} bpm
+              </p>
+              <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+                {formatDateTime(selected.at)}
+              </p>
+              <p className="mt-0.5 text-xs text-zinc-500">
+                ~{bucketSec}s average for this bar · tap again to clear
+              </p>
+            </div>
+          ) : (
+            <p className="mt-3 text-xs text-zinc-500">
+              Tap any bar on mobile (or hover on desktop) to see exact BPM and
+              time — no extra network request.
+            </p>
+          )}
         </div>
       )}
 
       <p className="mt-4 text-xs text-zinc-500">
-        Chart uses ~{data?.chartBucketSeconds ?? 40}s averages (not every raw
-        reading) so drops like 120→80 are easier to see. Data still only updates when
-        your watch syncs to Google Health.
+        Daily sleep and SpO₂ are cached ~15 min on the server. Live heart rate is
+        cached ~45s so multiple visitors share one Google fetch.
       </p>
     </div>
   );

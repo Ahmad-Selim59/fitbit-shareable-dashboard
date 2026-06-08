@@ -2,7 +2,7 @@ import { HeartRateSection } from "./components/heart-rate-section";
 import { SleepSection } from "./components/sleep-section";
 import { SpO2Section } from "./components/spo2-section";
 import { getConnectionStatus } from "@/lib/google-health/client";
-import { fetchDashboardData } from "@/lib/google-health/data";
+import { fetchDashboardDataCached } from "@/lib/google-health/data";
 
 export const dynamic = "force-dynamic";
 
@@ -61,7 +61,7 @@ export default async function Home() {
 
 async function DashboardContent() {
   try {
-    const data = await fetchDashboardData(7);
+    const data = await fetchDashboardDataCached(7);
 
     return (
       <>

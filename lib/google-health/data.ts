@@ -1,4 +1,5 @@
 import { healthFetch } from "./client";
+import { CACHE_TTL, withCache } from "./cache";
 import { queryDateRange } from "./dates";
 
 type CivilDateTime = { date?: string; time?: string };
@@ -230,4 +231,10 @@ export async function fetchDashboardData(
     sleep: normalizeSleep(sleepRaw),
     spo2: normalizeSpO2(spo2Raw),
   };
+}
+
+export function fetchDashboardDataCached(days = 7): Promise<DashboardData> {
+  return withCache(`dashboard:${days}`, CACHE_TTL.dailyMs, () =>
+    fetchDashboardData(days),
+  );
 }
