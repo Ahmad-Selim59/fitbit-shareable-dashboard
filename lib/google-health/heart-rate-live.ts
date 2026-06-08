@@ -1,5 +1,6 @@
 import { healthFetch } from "./client";
 import { CACHE_TTL, withCache } from "./cache";
+import { msUntilLocalMidnight } from "./dates";
 import { bucketSecondsForSpan } from "./downsample";
 import {
   API_MAX_HEART_RATE_DAYS,
@@ -199,9 +200,15 @@ function fetchLatestHeartRateCached(): Promise<LiveHeartRateSample | null> {
 }
 
 function dayCacheTtl(end: Date): number {
-  return isNearNow(end)
-    ? CACHE_TTL.heartRateDayTodayMs
-    : CACHE_TTL.heartRateDayHistoricalMs;
+  return isNearNow(end) ? CACHE_TTL.heartRateDayTodayMs : msUntilLocalMidnight();
+}
+
+function windowCacheTtl(end: Date): number {
+  return isNearNow(end) ? CACHE_TTL.liveHeartRateMs : msUntilLocalMidnight();
+}
+
+function hourCacheTtl(end: Date): number {
+  return isNearNow(end) ? CACHE_TTL.liveHeartRateMs : msUntilLocalMidnight();
 }
 
 function fetchDayRollupCached(
@@ -221,12 +228,6 @@ function fetchDayRollupCached(
 function windowCacheKey(windowHours: number, end: Date): string {
   const roundedEnd = Math.floor(end.getTime() / (5 * 60 * 1000));
   return `hr-window:${windowHours}:${roundedEnd}`;
-}
-
-function windowCacheTtl(end: Date): number {
-  return isNearNow(end)
-    ? CACHE_TTL.liveHeartRateMs
-    : CACHE_TTL.heartRateWindowHistoricalMs;
 }
 
 export async function fetchHeartRateWindowChart(options: {
@@ -335,7 +336,7 @@ export async function fetchHeartRateHourChart(options: {
 
   const chartSamples = await fetchRollupCached(
     `hr-hour:${dateKey}:${hour}`,
-    isLive ? CACHE_TTL.liveHeartRateMs : CACHE_TTL.heartRateHourMs,
+    hourCacheTtl(end),
     start,
     end,
     bucketSec,
