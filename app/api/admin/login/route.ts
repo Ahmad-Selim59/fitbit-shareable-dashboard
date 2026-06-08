@@ -1,11 +1,14 @@
 import { NextResponse } from "next/server";
+import {
+  getConfiguredAdminPassword,
+  verifySuperAdminPassword,
+} from "@/lib/admin/config";
 import { setAdminSession } from "@/lib/profiles/auth-cookies";
 
 export async function POST(request: Request) {
-  const adminPassword = process.env.ADMIN_PASSWORD?.trim();
-  if (!adminPassword) {
+  if (!getConfiguredAdminPassword()) {
     return NextResponse.json(
-      { error: "ADMIN_PASSWORD not configured" },
+      { error: "ADMIN_PASSWORD_ENC (or ADMIN_PASSWORD) not configured" },
       { status: 503 },
     );
   }
@@ -17,7 +20,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  if (body.password !== adminPassword) {
+  if (!verifySuperAdminPassword(body.password ?? "")) {
     return NextResponse.json({ error: "Incorrect password" }, { status: 401 });
   }
 

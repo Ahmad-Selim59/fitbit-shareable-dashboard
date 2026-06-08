@@ -23,7 +23,7 @@ In the SQL editor, run `supabase/migrations/001_profiles.sql`. All app access us
 
 ```bash
 cp env.example .env.local
-# fill GOOGLE_*, SUPABASE_*, TOKEN_ENCRYPTION_KEY, ADMIN_PASSWORD
+# fill GOOGLE_*, SUPABASE_*, TOKEN_ENCRYPTION_KEY, ADMIN_PASSWORD_ENC
 pnpm dev
 ```
 
@@ -32,6 +32,14 @@ Generate encryption key:
 ```bash
 openssl rand -hex 32
 ```
+
+Encrypt super-admin password (same key as Google tokens):
+
+```bash
+TOKEN_ENCRYPTION_KEY=your-64-hex-key node scripts/encrypt-admin-password.mjs "your-admin-password"
+```
+
+Paste the printed `ADMIN_PASSWORD_ENC=...` into `.env.local` or Vercel.
 
 ## Routes
 
@@ -42,7 +50,7 @@ openssl rand -hex 32
 | `/p/[slug]` | Profile dashboard |
 | `/p/[slug]/unlock` | Viewer password |
 | `/p/[slug]/manage` | Admin password — delete, re-check features |
-| `/admin` | Super-admin (`ADMIN_PASSWORD`) — delete any profile |
+| `/admin` | Super-admin (`ADMIN_PASSWORD_ENC`) — delete any profile |
 
 ## Vercel
 
@@ -51,7 +59,7 @@ Set all env vars from `env.example`, including:
 - `GOOGLE_REDIRECT_URI` = `https://YOUR-DOMAIN.vercel.app/api/auth/google/callback`
 - `NEXT_PUBLIC_APP_URL` = `https://YOUR-DOMAIN.vercel.app`
 - `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`
-- `TOKEN_ENCRYPTION_KEY`, `ADMIN_PASSWORD`
+- `TOKEN_ENCRYPTION_KEY`, `ADMIN_PASSWORD_ENC` (see `scripts/encrypt-admin-password.mjs`)
 
 ## Scripts
 

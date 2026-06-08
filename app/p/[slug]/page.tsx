@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { ProfileDashboard } from "@/app/components/profile-dashboard";
+import { RecordProfileVisit } from "@/app/components/record-profile-visit";
 import { requireProfileForView } from "@/lib/profiles/access";
+import { profileRequiresViewerPassword } from "@/lib/profiles/store";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +34,11 @@ export default async function ProfilePage({
       </header>
 
       <main className="mx-auto max-w-5xl space-y-10 px-4 py-8 sm:px-6">
+        <RecordProfileVisit
+          slug={profile.slug}
+          displayName={profile.display_name}
+          hasViewerPassword={profileRequiresViewerPassword(profile)}
+        />
         {query.joined === "1" && (
           <div className="rounded-lg bg-teal-50 px-4 py-3 text-sm text-teal-800 dark:bg-teal-950 dark:text-teal-200">
             Dashboard created. Save your admin password — you need it to manage

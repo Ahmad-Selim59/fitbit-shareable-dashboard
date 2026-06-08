@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { RecentlyVisited } from "./components/recently-visited";
 import { SlugSearch } from "./components/slug-search";
 import { listPublicProfiles } from "@/lib/profiles/store";
 
@@ -41,6 +42,8 @@ export default async function HomePage({
             Works for public and hidden profiles if you know the exact slug.
           </p>
         </section>
+
+        <RecentlyVisited />
 
         <section className="space-y-4">
           <div className="flex items-center justify-between">

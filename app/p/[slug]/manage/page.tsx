@@ -4,6 +4,7 @@ import { getProfileOrNull } from "@/lib/profiles/access";
 import {
   getProfileCapabilities,
   getProfileWatchType,
+  profileRequiresViewerPassword,
 } from "@/lib/profiles/store";
 import { redirect } from "next/navigation";
 
@@ -37,6 +38,7 @@ export default async function ManageProfilePage({
             slug={slug}
             watchType={getProfileWatchType(profile)}
             capabilities={getProfileCapabilities(profile)}
+            hasViewerPassword={profileRequiresViewerPassword(profile)}
           />
         </div>
       </main>

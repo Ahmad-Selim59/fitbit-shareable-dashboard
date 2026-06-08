@@ -13,15 +13,24 @@ export function ManageProfileForm({
   slug,
   watchType: initialWatchType,
   capabilities: initialCapabilities,
+  hasViewerPassword: initialHasViewerPassword,
 }: {
   slug: string;
   watchType: WatchType;
   capabilities: DashboardCapabilities | null;
+  hasViewerPassword: boolean;
 }) {
   const router = useRouter();
   const [adminPassword, setAdminPassword] = useState("");
   const [watchType, setWatchType] = useState(initialWatchType);
   const [capabilities, setCapabilities] = useState(initialCapabilities);
+  const [hasViewerPassword, setHasViewerPassword] = useState(
+    initialHasViewerPassword,
+  );
+  const [newAdminPassword, setNewAdminPassword] = useState("");
+  const [newAdminPasswordConfirm, setNewAdminPasswordConfirm] = useState("");
+  const [newViewerPassword, setNewViewerPassword] = useState("");
+  const [removeViewerPassword, setRemoveViewerPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -70,6 +79,72 @@ export function ManageProfileForm({
     }
   }
 
+  async function changePasswords() {
+    setLoading(true);
+    setError(null);
+    setMessage(null);
+
+    const changingAdmin = newAdminPassword.length > 0;
+    const changingViewer =
+      removeViewerPassword || newViewerPassword.length > 0;
+
+    if (!changingAdmin && !changingViewer) {
+      setError("Set a new password or choose to remove the viewer password.");
+      setLoading(false);
+      return;
+    }
+
+    if (changingAdmin) {
+      if (newAdminPassword.length < 4) {
+        setError("New admin password must be at least 4 characters.");
+        setLoading(false);
+        return;
+      }
+      if (newAdminPassword !== newAdminPasswordConfirm) {
+        setError("New admin passwords do not match.");
+        setLoading(false);
+        return;
+      }
+    }
+
+    try {
+      const res = await fetch(`/api/profiles/${slug}/passwords`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          adminPassword,
+          ...(changingAdmin ? { newAdminPassword } : {}),
+          ...(removeViewerPassword
+            ? { removeViewerPassword: true }
+            : newViewerPassword
+              ? { newViewerPassword }
+              : {}),
+        }),
+      });
+      const json = (await res.json()) as { error?: string };
+      if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
+
+      if (changingAdmin) {
+        setAdminPassword(newAdminPassword);
+        setNewAdminPassword("");
+        setNewAdminPasswordConfirm("");
+      }
+      if (removeViewerPassword) {
+        setHasViewerPassword(false);
+        setRemoveViewerPassword(false);
+        setNewViewerPassword("");
+      } else if (newViewerPassword) {
+        setHasViewerPassword(true);
+        setNewViewerPassword("");
+      }
+      setMessage("Passwords updated.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function deleteProfile() {
     if (!confirm("Delete this profile permanently? This cannot be undone.")) {
       return;
@@ -104,6 +179,81 @@ export function ManageProfileForm({
           onChange={(e) => setAdminPassword(e.target.value)}
           className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
         />
+      </div>
+
+      <div className="space-y-3 rounded-xl border border-zinc-200 p-4 dark:border-zinc-800">
+        <p className="text-sm font-medium text-zinc-800 dark:text-zinc-200">
+          Change passwords
+        </p>
+        <p className="text-xs text-zinc-500">
+          Current admin password required below. Viewer password is optional —
+          {hasViewerPassword
+            ? " currently set."
+            : " currently open to everyone."}
+        </p>
+
+        <div>
+          <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
+            New admin password
+          </label>
+          <input
+            type="password"
+            value={newAdminPassword}
+            onChange={(e) => setNewAdminPassword(e.target.value)}
+            placeholder="Leave blank to keep current"
+            className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+          />
+        </div>
+        <div>
+          <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
+            Confirm new admin password
+          </label>
+          <input
+            type="password"
+            value={newAdminPasswordConfirm}
+            onChange={(e) => setNewAdminPasswordConfirm(e.target.value)}
+            className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+          />
+        </div>
+
+        <div>
+          <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
+            New viewer password
+          </label>
+          <input
+            type="password"
+            value={newViewerPassword}
+            onChange={(e) => {
+              setNewViewerPassword(e.target.value);
+              if (e.target.value) setRemoveViewerPassword(false);
+            }}
+            disabled={removeViewerPassword}
+            placeholder="Leave blank to keep current"
+            className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900"
+          />
+        </div>
+        {hasViewerPassword && (
+          <label className="flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-400">
+            <input
+              type="checkbox"
+              checked={removeViewerPassword}
+              onChange={(e) => {
+                setRemoveViewerPassword(e.target.checked);
+                if (e.target.checked) setNewViewerPassword("");
+              }}
+            />
+            Remove viewer password (open access)
+          </label>
+        )}
+
+        <button
+          type="button"
+          onClick={changePasswords}
+          disabled={loading || !adminPassword}
+          className="rounded-lg border border-zinc-300 px-3 py-1.5 text-xs font-medium disabled:opacity-60"
+        >
+          Update passwords
+        </button>
       </div>
 
       <div className="space-y-2">

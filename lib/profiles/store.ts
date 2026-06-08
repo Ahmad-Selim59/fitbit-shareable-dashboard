@@ -161,6 +161,28 @@ export async function updateProfileWatchType(
   if (error) throw new Error(error.message);
 }
 
+export async function updateProfilePasswords(
+  slug: string,
+  updates: {
+    adminPasswordHash?: string;
+    viewerPasswordHash?: string | null;
+  },
+): Promise<void> {
+  const row: Record<string, string | null> = {
+    updated_at: new Date().toISOString(),
+  };
+  if (updates.adminPasswordHash !== undefined) {
+    row.admin_password_hash = updates.adminPasswordHash;
+  }
+  if (updates.viewerPasswordHash !== undefined) {
+    row.viewer_password_hash = updates.viewerPasswordHash;
+  }
+
+  const supabase = getSupabaseAdmin();
+  const { error } = await supabase.from("profiles").update(row).eq("slug", slug);
+  if (error) throw new Error(error.message);
+}
+
 export async function deleteProfile(slug: string): Promise<ProfileRow | null> {
   const profile = await getProfileBySlug(slug);
   if (!profile) return null;
