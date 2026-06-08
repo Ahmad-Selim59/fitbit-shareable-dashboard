@@ -17,6 +17,7 @@ function formatDateLabel(date: string): string {
 }
 
 export function HeartRateSection({
+  profileSlug,
   days,
   stepsHistory,
   initialToday,
@@ -28,6 +29,7 @@ export function HeartRateSection({
   showLiveHeartRate = true,
   showSteps = true,
 }: {
+  profileSlug: string;
   days: RestingHeartRateDay[];
   stepsHistory: StepsDay[];
   initialToday: StepsDay | null;
@@ -45,11 +47,18 @@ export function HeartRateSection({
   return (
     <section className="space-y-8">
       {showDeviceBattery && (
-        <DeviceBatteryCard initial={deviceStatus} watchType={watchType} />
+        <DeviceBatteryCard
+          profileSlug={profileSlug}
+          initial={deviceStatus}
+          watchType={watchType}
+        />
       )}
-      {showLiveHeartRate && <LiveHeartRate syncAppHint={hint} />}
+      {showLiveHeartRate && (
+        <LiveHeartRate profileSlug={profileSlug} syncAppHint={hint} />
+      )}
       {showSteps && (
         <TodaySteps
+          profileSlug={profileSlug}
           history={stepsHistory}
           initialToday={initialToday}
           initialError={stepsError}

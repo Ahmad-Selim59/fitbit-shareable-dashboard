@@ -6,7 +6,7 @@ import {
   getGoogleClientSecret,
   getGoogleRedirectUri,
 } from "./config";
-import { loadTokens, saveTokens, type GoogleHealthTokens } from "./tokens";
+import type { GoogleHealthTokens } from "./types";
 
 type TokenResponse = {
   access_token: string;
@@ -50,7 +50,9 @@ function toStoredTokens(
 ): GoogleHealthTokens {
   const rt = data.refresh_token || fallbackRefreshToken;
   if (!rt) {
-    throw new Error("No refresh token received. Try disconnecting and connecting again.");
+    throw new Error(
+      "No refresh token received. Try disconnecting and connecting again.",
+    );
   }
 
   return {
@@ -74,14 +76,12 @@ export async function exchangeCodeForTokens(
   });
 
   const data = await fetchTokens(body);
-  const previous = await loadTokens();
-  const tokens = toStoredTokens(data, previous?.refreshToken, previous?.healthUserId);
-  await saveTokens(tokens);
-  return tokens;
+  return toStoredTokens(data);
 }
 
 export async function refreshAccessToken(
   refreshToken: string,
+  healthUserId?: string,
 ): Promise<GoogleHealthTokens> {
   const body = new URLSearchParams({
     client_id: getGoogleClientId(),
@@ -91,8 +91,5 @@ export async function refreshAccessToken(
   });
 
   const data = await fetchTokens(body);
-  const previous = await loadTokens();
-  const tokens = toStoredTokens(data, refreshToken, previous?.healthUserId);
-  await saveTokens(tokens);
-  return tokens;
+  return toStoredTokens(data, refreshToken, healthUserId);
 }

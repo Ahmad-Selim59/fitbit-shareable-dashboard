@@ -1,86 +1,51 @@
 import { GOOGLE_REVOKE_URL, HEALTH_API_BASE } from "./config";
 import { refreshAccessToken } from "./oauth";
+import type { GoogleHealthTokens } from "./types";
 import {
-  getConfiguredRefreshToken,
-  isTokenExpired,
-  loadTokens,
-  saveTokens,
-  type GoogleHealthTokens,
-} from "./tokens";
+  getProfileBySlug,
+  getTokensForProfile,
+  saveTokensForProfile,
+} from "@/lib/profiles/store";
 
-async function getValidTokens(): Promise<GoogleHealthTokens | null> {
-  const refreshToken = await getConfiguredRefreshToken();
-  if (!refreshToken) return null;
+function isTokenExpired(tokens: GoogleHealthTokens): boolean {
+  return Date.now() >= tokens.expiresAt - 60_000;
+}
 
-  const cached = await loadTokens();
-  if (
-    cached?.refreshToken === refreshToken &&
-    !isTokenExpired(cached)
-  ) {
-    return cached;
+export async function getValidTokensForProfile(
+  slug: string,
+): Promise<GoogleHealthTokens | null> {
+  const profile = await getProfileBySlug(slug);
+  if (!profile) return null;
+
+  const stored = await getTokensForProfile(profile);
+  if (!stored?.refreshToken) return null;
+
+  if (stored.accessToken && !isTokenExpired(stored)) {
+    return stored;
   }
 
   try {
-    return await refreshAccessToken(refreshToken);
+    const refreshed = await refreshAccessToken(
+      stored.refreshToken,
+      stored.healthUserId,
+    );
+    await saveTokensForProfile(slug, refreshed);
+    return refreshed;
   } catch {
     return null;
   }
 }
 
-export async function isGoogleHealthConnected(): Promise<boolean> {
-  if (!(await getConfiguredRefreshToken())) return false;
-  const tokens = await getValidTokens();
-  return tokens !== null;
+export async function isProfileConnected(slug: string): Promise<boolean> {
+  return (await getValidTokensForProfile(slug)) !== null;
 }
 
-export type ConnectionStatus = {
-  configured: boolean;
-  working: boolean;
-  tokenSource: "env" | "cookie" | "none";
-  dashboardPasswordRequired: boolean;
-  refreshError?: string;
-};
-
-/** For /setup diagnostics — does not expose secrets. */
-export async function getConnectionStatus(): Promise<ConnectionStatus> {
-  const { getEnvRefreshToken } = await import("./config");
-  const envRefresh = getEnvRefreshToken();
-  const stored = await loadTokens();
-  const configured = Boolean(envRefresh || stored?.refreshToken);
-
-  let working = false;
-  let refreshError: string | undefined;
-
-  if (configured) {
-    working = (await getValidTokens()) !== null;
-    if (!working) {
-      const refreshToken = await getConfiguredRefreshToken();
-      if (refreshToken) {
-        try {
-          await refreshAccessToken(refreshToken);
-          working = true;
-        } catch (err) {
-          refreshError =
-            err instanceof Error ? err.message : "Token refresh failed";
-        }
-      }
-    }
-  }
-
-  return {
-    configured,
-    working,
-    tokenSource: envRefresh ? "env" : stored?.refreshToken ? "cookie" : "none",
-    dashboardPasswordRequired: Boolean(process.env.DASHBOARD_PASSWORD),
-    refreshError,
-  };
-}
-
-export async function healthFetch<T>(
+export async function healthFetchForProfile<T>(
+  slug: string,
   path: string,
   init: RequestInit = {},
 ): Promise<T> {
-  let tokens = await getValidTokens();
+  let tokens = await getValidTokensForProfile(slug);
   if (!tokens) {
     throw new Error("NOT_CONNECTED");
   }
@@ -105,7 +70,8 @@ export async function healthFetch<T>(
   });
 
   if (response.status === 401 && tokens.refreshToken) {
-    tokens = await refreshAccessToken(tokens.refreshToken);
+    tokens = await refreshAccessToken(tokens.refreshToken, tokens.healthUserId);
+    await saveTokensForProfile(slug, tokens);
     headers.Authorization = `Bearer ${tokens.accessToken}`;
     response = await fetch(url, {
       ...init,
@@ -122,37 +88,36 @@ export async function healthFetch<T>(
   return response.json() as Promise<T>;
 }
 
-export async function fetchAndStoreIdentity(): Promise<void> {
-  const identity = await healthFetch<{
+export async function fetchAndStoreIdentityForProfile(
+  slug: string,
+): Promise<void> {
+  const identity = await healthFetchForProfile<{
     healthUserId?: string;
     legacyUserId?: string;
-  }>("/v4/users/me/identity");
+  }>(slug, "/v4/users/me/identity");
 
-  const tokens = await loadTokens();
+  const tokens = await getValidTokensForProfile(slug);
   if (!tokens) return;
 
-  await saveTokens({
+  await saveTokensForProfile(slug, {
     ...tokens,
     healthUserId: identity.healthUserId,
   });
 }
 
-export async function disconnectGoogleHealth(): Promise<{
-  envTokenStillSet: boolean;
-}> {
-  const refreshToken = await getConfiguredRefreshToken();
-  if (refreshToken) {
+export async function disconnectProfile(slug: string): Promise<void> {
+  const profile = await getProfileBySlug(slug);
+  if (!profile) return;
+
+  const tokens = await getTokensForProfile(profile);
+  if (tokens?.refreshToken) {
     try {
       await fetch(
-        `${GOOGLE_REVOKE_URL}?token=${encodeURIComponent(refreshToken)}`,
+        `${GOOGLE_REVOKE_URL}?token=${encodeURIComponent(tokens.refreshToken)}`,
         { method: "POST" },
       );
     } catch {
-      // revoke is best-effort
+      // best-effort
     }
   }
-  const { clearTokens } = await import("./tokens");
-  await clearTokens();
-  const { getEnvRefreshToken } = await import("./config");
-  return { envTokenStillSet: Boolean(getEnvRefreshToken()) };
 }

@@ -63,9 +63,11 @@ function needsReauth(error?: string): boolean {
 }
 
 export function DeviceBatteryCard({
+  profileSlug,
   initial,
   watchType = "fitbit",
 }: {
+  profileSlug: string;
   initial: DeviceFetchResult;
   watchType?: WatchType;
 }) {
@@ -76,7 +78,10 @@ export function DeviceBatteryCard({
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/health/device-status", { cache: "no-store" });
+      const res = await fetch(
+        `/api/profiles/${profileSlug}/health/device-status`,
+        { cache: "no-store" },
+      );
       const json = (await res.json()) as DeviceFetchResult & { error?: string };
       if (!res.ok) {
         setError(json.error ?? `HTTP ${res.status}`);
@@ -89,7 +94,7 @@ export function DeviceBatteryCard({
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [profileSlug]);
 
   useEffect(() => {
     const id = setInterval(load, POLL_MS);
@@ -136,9 +141,9 @@ export function DeviceBatteryCard({
               <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
                 {reauth ? (
                   <>
-                    Re-connect at{" "}
-                    <a href="/setup" className="font-medium underline">
-                      /setup
+                    Re-connect Google Health from{" "}
+                    <a href="/join" className="font-medium underline">
+                      /join
                     </a>{" "}
                     — needs the Google Health <strong>settings</strong> scope for
                     paired devices.

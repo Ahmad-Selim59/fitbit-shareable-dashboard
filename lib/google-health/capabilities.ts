@@ -4,22 +4,26 @@ import { fetchDeviceStatus } from "./device";
 import { fetchHeartRateWindowChart } from "./heart-rate-live";
 import { fetchStepsHistory, fetchTodaySteps } from "./steps";
 
-export async function probeDashboardCapabilities(): Promise<DashboardCapabilities> {
+export async function probeDashboardCapabilities(
+  slug: string,
+): Promise<DashboardCapabilities> {
   const [dashboard, stepsHistory, todaySteps, deviceStatus, liveHr] =
     await Promise.all([
-      fetchDashboardData(7).catch(() => ({
+      fetchDashboardData(slug, 7).catch(() => ({
         range: { start: "", end: "" },
         restingHeartRate: [],
         sleep: [],
         spo2: [],
       })),
-      fetchStepsHistory(7).catch(() => ({ days: [] as { date: string; steps: number }[] })),
-      fetchTodaySteps().catch(() => ({
+      fetchStepsHistory(slug, 7).catch(() => ({
+        days: [] as { date: string; steps: number }[],
+      })),
+      fetchTodaySteps(slug).catch(() => ({
         days: [],
         today: null as { date: string; steps: number } | null,
       })),
-      fetchDeviceStatus().catch(() => ({ device: null })),
-      fetchHeartRateWindowChart({ windowHours: 24 }).catch(() => ({
+      fetchDeviceStatus(slug).catch(() => ({ device: null })),
+      fetchHeartRateWindowChart(slug, { windowHours: 24 }).catch(() => ({
         chartSamples: [] as { bpm: number; at: string }[],
       })),
     ]);

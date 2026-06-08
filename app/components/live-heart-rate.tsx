@@ -201,8 +201,10 @@ function HeartRateChart({
 }
 
 export function LiveHeartRate({
+  profileSlug,
   syncAppHint = "Open the Google Health app to sync your watch",
 }: {
+  profileSlug: string;
   syncAppHint?: string;
 }) {
   const [data, setData] = useState<LiveHeartRateData | null>(null);
@@ -270,9 +272,10 @@ export function LiveHeartRate({
         params.set("end", effectiveEnd.toISOString());
       }
 
-      const res = await fetch(`/api/health/live-heart-rate?${params}`, {
-        cache: "no-store",
-      });
+      const res = await fetch(
+        `/api/profiles/${profileSlug}/health/live-heart-rate?${params}`,
+        { cache: "no-store" },
+      );
       if (!res.ok) {
         const body = (await res.json()) as { error?: string };
         throw new Error(body.error ?? `HTTP ${res.status}`);
@@ -287,7 +290,7 @@ export function LiveHeartRate({
     } finally {
       setLoading(false);
     }
-  }, [uiView, windowHours, windowEnd, selectedDay, selectedHour]);
+  }, [profileSlug, uiView, windowHours, windowEnd, selectedDay, selectedHour]);
 
   useEffect(() => {
     setLoading(true);

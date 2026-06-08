@@ -81,6 +81,10 @@ export async function withCache<T>(
   return data;
 }
 
+export function profileCacheKey(slug: string, key: string): string {
+  return `profile:${slug}:${key}`;
+}
+
 export const CACHE_TTL = {
   /** Sleep, SpO₂, daily resting HR — changes slowly */
   dailyMs: 15 * 60 * 1000,

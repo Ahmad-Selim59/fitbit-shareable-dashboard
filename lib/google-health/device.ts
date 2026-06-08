@@ -1,5 +1,5 @@
-import { healthFetch } from "./client";
-import { CACHE_TTL, withCache } from "./cache";
+import { healthFetchForProfile } from "./client";
+import { CACHE_TTL, profileCacheKey, withCache } from "./cache";
 
 type PairedDevice = {
   deviceType?: string;
@@ -55,9 +55,12 @@ function pickTracker(devices: PairedDevice[]): PairedDevice | null {
   );
 }
 
-export async function fetchDeviceStatus(): Promise<DeviceFetchResult> {
+export async function fetchDeviceStatus(
+  slug: string,
+): Promise<DeviceFetchResult> {
   try {
-    const res = await healthFetch<ListPairedDevicesResponse>(
+    const res = await healthFetchForProfile<ListPairedDevicesResponse>(
+      slug,
       "/v4/users/me/pairedDevices",
     );
     const devices = res.pairedDevices ?? res.paired_devices ?? [];
@@ -73,7 +76,12 @@ export async function fetchDeviceStatus(): Promise<DeviceFetchResult> {
   }
 }
 
-/** Cached 1h on success only — errors/empty are not cached (see cache.ts). */
-export function fetchDeviceStatusCached(): Promise<DeviceFetchResult> {
-  return withCache("device-status", CACHE_TTL.deviceMs, fetchDeviceStatus);
+export function fetchDeviceStatusCached(
+  slug: string,
+): Promise<DeviceFetchResult> {
+  return withCache(
+    profileCacheKey(slug, "device-status"),
+    CACHE_TTL.deviceMs,
+    () => fetchDeviceStatus(slug),
+  );
 }

@@ -1,5 +1,5 @@
-import { healthFetch } from "./client";
-import { withCache } from "./cache";
+import { healthFetchForProfile } from "./client";
+import { profileCacheKey, withCache } from "./cache";
 import {
   civilDateTimeToString,
   localTodayDateKey,
@@ -51,10 +51,12 @@ function normalizeStepsRollup(points: StepsRollupPoint[]): StepsDay[] {
 }
 
 async function fetchStepsRollupRange(
+  slug: string,
   startDate: string,
   endExclusiveDate: string,
 ): Promise<StepsDay[]> {
-  const res = await healthFetch<DailyRollUpResponse>(
+  const res = await healthFetchForProfile<DailyRollUpResponse>(
+    slug,
     "/v4/users/me/dataTypes/steps/dataPoints:dailyRollUp",
     {
       method: "POST",
@@ -71,14 +73,18 @@ async function fetchStepsRollupRange(
   return normalizeStepsRollup(points);
 }
 
-/** Past days only — excludes today. Cached on server until local midnight. */
 export async function fetchStepsHistory(
+  slug: string,
   days = HISTORY_DAYS,
 ): Promise<StepsFetchResult> {
   const todayKey = localTodayDateKey();
   try {
     const range = queryDateRange(days);
-    const rows = await fetchStepsRollupRange(range.start, range.endExclusive);
+    const rows = await fetchStepsRollupRange(
+      slug,
+      range.start,
+      range.endExclusive,
+    );
     return { days: rows.filter((d) => d.date !== todayKey) };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to load steps";
@@ -88,20 +94,24 @@ export async function fetchStepsHistory(
 }
 
 export function fetchStepsHistoryCached(
+  slug: string,
   days = HISTORY_DAYS,
 ): Promise<StepsFetchResult> {
   return withCache(
-    `steps-history:${days}`,
+    profileCacheKey(slug, `steps-history:${days}`),
     msUntilLocalMidnight(),
-    () => fetchStepsHistory(days),
+    () => fetchStepsHistory(slug, days),
   );
 }
 
-/** Today only — always fetched fresh, never cached. */
-export async function fetchTodaySteps(): Promise<TodayStepsResult> {
+export async function fetchTodaySteps(slug: string): Promise<TodayStepsResult> {
   const todayKey = localTodayDateKey();
   try {
-    const rows = await fetchStepsRollupRange(todayKey, nextDayAfter(todayKey));
+    const rows = await fetchStepsRollupRange(
+      slug,
+      todayKey,
+      nextDayAfter(todayKey),
+    );
     const today = rows.find((d) => d.date === todayKey) ?? rows[0] ?? null;
     return { days: today ? [today] : [], today };
   } catch (err) {

@@ -1,5 +1,5 @@
-import { healthFetch } from "./client";
-import { CACHE_TTL, withCache } from "./cache";
+import { healthFetchForProfile } from "./client";
+import { CACHE_TTL, profileCacheKey, withCache } from "./cache";
 import { queryDateRange, civilDateTimeToString } from "./dates";
 
 type CivilDateTime = { date?: string | { year?: number; month?: number; day?: number }; time?: string };
@@ -91,6 +91,7 @@ function parseIntField(value?: string): number {
 }
 
 async function listAllDataPoints(
+  slug: string,
   dataType: string,
   filter: string,
   pageSize = 100,
@@ -106,7 +107,7 @@ async function listAllDataPoints(
     if (pageToken) params.set("pageToken", pageToken);
 
     const path = `/v4/users/me/dataTypes/${dataType}/dataPoints?${params}`;
-    const res = await healthFetch<ListResponse>(path);
+    const res = await healthFetchForProfile<ListResponse>(slug, path);
     all.push(...(res.dataPoints ?? []));
     pageToken = res.nextPageToken;
   } while (pageToken);
@@ -203,24 +204,24 @@ async function fetchSafe(
 }
 
 export async function fetchDashboardData(
+  slug: string,
   days = 7,
 ): Promise<DashboardData> {
   const range = queryDateRange(days);
 
-  // Filter fields use snake_case (see https://developers.google.com/health/endpoints)
   const restingFilter = `daily_resting_heart_rate.date >= "${range.start}" AND daily_resting_heart_rate.date < "${range.endExclusive}"`;
   const sleepFilter = `sleep.interval.civil_end_time >= "${range.start}" AND sleep.interval.civil_end_time < "${range.endExclusive}"`;
   const spo2Filter = `daily_oxygen_saturation.date >= "${range.start}" AND daily_oxygen_saturation.date < "${range.endExclusive}"`;
 
   const [restingRaw, sleepRaw, spo2Raw] = await Promise.all([
     fetchSafe("daily-resting-heart-rate", () =>
-      listAllDataPoints("daily-resting-heart-rate", restingFilter),
+      listAllDataPoints(slug, "daily-resting-heart-rate", restingFilter),
     ),
     fetchSafe("sleep", () =>
-      listAllDataPoints("sleep", sleepFilter, 25),
+      listAllDataPoints(slug, "sleep", sleepFilter, 25),
     ),
     fetchSafe("daily-oxygen-saturation", () =>
-      listAllDataPoints("daily-oxygen-saturation", spo2Filter),
+      listAllDataPoints(slug, "daily-oxygen-saturation", spo2Filter),
     ),
   ]);
 
@@ -232,8 +233,13 @@ export async function fetchDashboardData(
   };
 }
 
-export function fetchDashboardDataCached(days = 7): Promise<DashboardData> {
-  return withCache(`dashboard:${days}`, CACHE_TTL.dailyMs, () =>
-    fetchDashboardData(days),
+export function fetchDashboardDataCached(
+  slug: string,
+  days = 7,
+): Promise<DashboardData> {
+  return withCache(
+    profileCacheKey(slug, `dashboard:${days}`),
+    CACHE_TTL.dailyMs,
+    () => fetchDashboardData(slug, days),
   );
 }

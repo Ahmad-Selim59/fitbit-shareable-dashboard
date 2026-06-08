@@ -19,10 +19,12 @@ function formatSteps(n: number): string {
 }
 
 export function TodaySteps({
+  profileSlug,
   history,
   initialToday,
   initialError,
 }: {
+  profileSlug: string;
   history: StepsDay[];
   initialToday: StepsDay | null;
   initialError?: string;
@@ -33,7 +35,10 @@ export function TodaySteps({
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch("/api/health/today-steps", { cache: "no-store" });
+      const res = await fetch(
+        `/api/profiles/${profileSlug}/health/today-steps`,
+        { cache: "no-store" },
+      );
       if (!res.ok) {
         const body = (await res.json()) as { error?: string };
         throw new Error(body.error ?? `HTTP ${res.status}`);
@@ -49,7 +54,7 @@ export function TodaySteps({
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [profileSlug]);
 
   useEffect(() => {
     load();

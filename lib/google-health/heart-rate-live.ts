@@ -1,5 +1,5 @@
-import { healthFetch } from "./client";
-import { CACHE_TTL, withCache } from "./cache";
+import { healthFetchForProfile } from "./client";
+import { CACHE_TTL, profileCacheKey, withCache } from "./cache";
 import { msUntilLocalMidnight } from "./dates";
 import { bucketSecondsForSpan } from "./downsample";
 import {
@@ -113,6 +113,7 @@ function assertInRange(end: Date): void {
 }
 
 async function fetchHeartRateRollup(
+  slug: string,
   start: Date,
   end: Date,
   windowSeconds: number,
@@ -132,7 +133,8 @@ async function fetchHeartRateRollup(
     };
     if (pageToken) body.pageToken = pageToken;
 
-    const res = await healthFetch<RollUpResponse>(
+    const res = await healthFetchForProfile<RollUpResponse>(
+      slug,
       "/v4/users/me/dataTypes/heart-rate/dataPoints:rollUp",
       { method: "POST", body: JSON.stringify(body) },
     );
@@ -156,25 +158,28 @@ async function fetchHeartRateRollup(
 }
 
 function fetchRollupCached(
+  slug: string,
   cacheKey: string,
   ttlMs: number,
   start: Date,
   end: Date,
   windowSeconds: number,
 ): Promise<LiveHeartRateSample[]> {
-  return withCache(cacheKey, ttlMs, () =>
-    fetchHeartRateRollup(start, end, windowSeconds),
+  return withCache(profileCacheKey(slug, cacheKey), ttlMs, () =>
+    fetchHeartRateRollup(slug, start, end, windowSeconds),
   );
 }
 
 async function fetchLatestHeartRate(
+  slug: string,
   before = new Date(),
 ): Promise<LiveHeartRateSample | null> {
   const end = before;
   const start = new Date(end.getTime() - 60 * 60 * 1000);
   const filter = `heart_rate.sample_time.physical_time >= "${start.toISOString()}" AND heart_rate.sample_time.physical_time < "${end.toISOString()}"`;
 
-  const res = await healthFetch<ListResponse>(
+  const res = await healthFetchForProfile<ListResponse>(
+    slug,
     `/v4/users/me/dataTypes/heart-rate/dataPoints?${new URLSearchParams({
       filter,
       pageSize: "25",
@@ -193,9 +198,13 @@ async function fetchLatestHeartRate(
   return latest;
 }
 
-function fetchLatestHeartRateCached(): Promise<LiveHeartRateSample | null> {
-  return withCache("hr-latest", CACHE_TTL.heartRateLatestMs, () =>
-    fetchLatestHeartRate(new Date()),
+function fetchLatestHeartRateCached(
+  slug: string,
+): Promise<LiveHeartRateSample | null> {
+  return withCache(
+    profileCacheKey(slug, "hr-latest"),
+    CACHE_TTL.heartRateLatestMs,
+    () => fetchLatestHeartRate(slug, new Date()),
   );
 }
 
@@ -212,11 +221,13 @@ function hourCacheTtl(end: Date): number {
 }
 
 function fetchDayRollupCached(
+  slug: string,
   dateKey: string,
   start: Date,
   end: Date,
 ): Promise<LiveHeartRateSample[]> {
   return fetchRollupCached(
+    slug,
     `hr-day:${dateKey}`,
     dayCacheTtl(end),
     start,
@@ -230,10 +241,13 @@ function windowCacheKey(windowHours: number, end: Date): string {
   return `hr-window:${windowHours}:${roundedEnd}`;
 }
 
-export async function fetchHeartRateWindowChart(options: {
-  windowHours?: number;
-  end?: Date;
-}): Promise<LiveHeartRateData> {
+export async function fetchHeartRateWindowChart(
+  slug: string,
+  options: {
+    windowHours?: number;
+    end?: Date;
+  } = {},
+): Promise<LiveHeartRateData> {
   const windowHours = clampWindowHours(options.windowHours ?? 2);
   const end = options.end ?? new Date();
   assertInRange(end);
@@ -251,6 +265,7 @@ export async function fetchHeartRateWindowChart(options: {
   const bucketSec = rollupWindowSeconds(windowHours);
 
   const allBuckets = await fetchRollupCached(
+    slug,
     windowCacheKey(windowHours, end),
     windowCacheTtl(end),
     fetchStart,
@@ -267,7 +282,7 @@ export async function fetchHeartRateWindowChart(options: {
   );
 
   const latest = isLive
-    ? await fetchLatestHeartRateCached()
+    ? await fetchLatestHeartRateCached(slug)
     : (chartSamples.at(-1) ?? null);
 
   return {
@@ -287,19 +302,22 @@ export async function fetchHeartRateWindowChart(options: {
   };
 }
 
-export async function fetchHeartRateDayChart(options: {
-  dateKey: string;
-  start: Date;
-  end: Date;
-}): Promise<LiveHeartRateData> {
+export async function fetchHeartRateDayChart(
+  slug: string,
+  options: {
+    dateKey: string;
+    start: Date;
+    end: Date;
+  },
+): Promise<LiveHeartRateData> {
   const { dateKey, start, end } = options;
   assertInRange(end);
   const isLive = isNearNow(end);
 
-  const chartSamples = await fetchDayRollupCached(dateKey, start, end);
+  const chartSamples = await fetchDayRollupCached(slug, dateKey, start, end);
   const stats = computeStats(chartSamples);
   const latest = isLive
-    ? await fetchLatestHeartRateCached()
+    ? await fetchLatestHeartRateCached(slug)
     : (chartSamples.at(-1) ?? null);
 
   return {
@@ -321,20 +339,24 @@ export async function fetchHeartRateDayChart(options: {
   };
 }
 
-export async function fetchHeartRateHourChart(options: {
-  dateKey: string;
-  hour: number;
-  start: Date;
-  end: Date;
-  dayStart: Date;
-  dayEnd: Date;
-}): Promise<LiveHeartRateData> {
+export async function fetchHeartRateHourChart(
+  slug: string,
+  options: {
+    dateKey: string;
+    hour: number;
+    start: Date;
+    end: Date;
+    dayStart: Date;
+    dayEnd: Date;
+  },
+): Promise<LiveHeartRateData> {
   const { dateKey, hour, start, end, dayStart, dayEnd } = options;
   assertInRange(end);
   const isLive = isNearNow(end);
   const bucketSec = rollupWindowSeconds(1);
 
   const chartSamples = await fetchRollupCached(
+    slug,
     `hr-hour:${dateKey}:${hour}`,
     hourCacheTtl(end),
     start,
@@ -342,10 +364,10 @@ export async function fetchHeartRateHourChart(options: {
     bucketSec,
   );
 
-  const daySamples = await fetchDayRollupCached(dateKey, dayStart, dayEnd);
+  const daySamples = await fetchDayRollupCached(slug, dateKey, dayStart, dayEnd);
 
   const latest = isLive
-    ? await fetchLatestHeartRateCached()
+    ? await fetchLatestHeartRateCached(slug)
     : (chartSamples.at(-1) ?? null);
 
   return {
@@ -368,56 +390,39 @@ export async function fetchHeartRateHourChart(options: {
   };
 }
 
-export function fetchHeartRateWindowChartCached(options: {
-  windowHours?: number;
-  end?: Date;
-}): Promise<LiveHeartRateData> {
-  return fetchHeartRateWindowChart(options);
+export function fetchHeartRateWindowChartCached(
+  slug: string,
+  options: {
+    windowHours?: number;
+    end?: Date;
+  } = {},
+): Promise<LiveHeartRateData> {
+  return fetchHeartRateWindowChart(slug, options);
 }
 
-export function fetchHeartRateDayChartCached(options: {
-  dateKey: string;
-  start: Date;
-  end: Date;
-}): Promise<LiveHeartRateData> {
-  return fetchHeartRateDayChart(options);
+export function fetchHeartRateDayChartCached(
+  slug: string,
+  options: {
+    dateKey: string;
+    start: Date;
+    end: Date;
+  },
+): Promise<LiveHeartRateData> {
+  return fetchHeartRateDayChart(slug, options);
 }
 
-export function fetchHeartRateHourChartCached(options: {
-  dateKey: string;
-  hour: number;
-  start: Date;
-  end: Date;
-  dayStart: Date;
-  dayEnd: Date;
-}): Promise<LiveHeartRateData> {
-  return fetchHeartRateHourChart(options);
-}
-
-/** @deprecated use fetchHeartRateWindowChartCached */
-export async function fetchHeartRateChart(options: {
-  windowHours?: number;
-  end?: Date;
-}): Promise<LiveHeartRateData> {
-  return fetchHeartRateWindowChart(options);
-}
-
-/** @deprecated use fetchHeartRateWindowChartCached */
-export function fetchHeartRateChartCached(options: {
-  windowHours?: number;
-  end?: Date;
-}): Promise<LiveHeartRateData> {
-  return fetchHeartRateWindowChartCached(options);
-}
-
-/** @deprecated use fetchHeartRateWindowChartCached */
-export async function fetchLiveHeartRate(): Promise<LiveHeartRateData> {
-  return fetchHeartRateWindowChart({ windowHours: 2 });
-}
-
-/** @deprecated use fetchHeartRateWindowChartCached */
-export function fetchLiveHeartRateCached(): Promise<LiveHeartRateData> {
-  return fetchHeartRateWindowChartCached({ windowHours: 2 });
+export function fetchHeartRateHourChartCached(
+  slug: string,
+  options: {
+    dateKey: string;
+    hour: number;
+    start: Date;
+    end: Date;
+    dayStart: Date;
+    dayEnd: Date;
+  },
+): Promise<LiveHeartRateData> {
+  return fetchHeartRateHourChart(slug, options);
 }
 
 export { bucketSecondsForSpan };

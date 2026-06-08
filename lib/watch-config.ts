@@ -20,21 +20,6 @@ export function parseWatchType(value: string | undefined | null): WatchType {
   return "fitbit";
 }
 
-export function getEnvWatchType(): WatchType | undefined {
-  const raw = process.env.WATCH_TYPE?.trim().toLowerCase();
-  if (!raw) return undefined;
-  return parseWatchType(raw);
-}
-
-export function getEnvFeatureOverrides(): Partial<DashboardCapabilities> {
-  const overrides: Partial<DashboardCapabilities> = {};
-  const battery = process.env.FEATURES_DEVICE_BATTERY?.trim().toLowerCase();
-  if (battery === "false" || battery === "0") {
-    overrides.deviceBattery = false;
-  }
-  return overrides;
-}
-
 export function defaultCapabilitiesForWatch(
   watchType: WatchType,
 ): DashboardCapabilities {
@@ -51,21 +36,10 @@ export function defaultCapabilitiesForWatch(
 export function resolveEffectiveCapabilities(options: {
   watchType: WatchType;
   probed: DashboardCapabilities | null;
-  envOverrides?: Partial<DashboardCapabilities>;
 }): EffectiveCapabilities {
-  const { watchType, probed, envOverrides = getEnvFeatureOverrides() } =
-    options;
+  const { watchType, probed } = options;
   const base = probed ?? defaultCapabilitiesForWatch(watchType);
-
-  return {
-    restingHeartRate: base.restingHeartRate,
-    liveHeartRate: base.liveHeartRate,
-    steps: base.steps,
-    sleep: base.sleep,
-    spo2: base.spo2,
-    deviceBattery:
-      envOverrides.deviceBattery !== false && base.deviceBattery,
-  };
+  return { ...base };
 }
 
 export function watchTypeLabel(watchType: WatchType): string {

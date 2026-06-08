@@ -1,16 +1,25 @@
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { getAppUrl } from "@/lib/google-health/config";
-import { fetchAndStoreIdentity } from "@/lib/google-health/client";
+import { fetchAndStoreIdentityForProfile } from "@/lib/google-health/client";
+import { probeDashboardCapabilities } from "@/lib/google-health/capabilities";
 import { exchangeCodeForTokens } from "@/lib/google-health/oauth";
+import {
+  clearPendingJoin,
+  getPendingJoin,
+} from "@/lib/profiles/auth-cookies";
+import {
+  createProfileFromJoin,
+  updateProfileCapabilities,
+} from "@/lib/profiles/store";
 
 const STATE_COOKIE = "google_oauth_state";
 
-function redirectToSetup(
+function redirectToJoin(
   appUrl: string,
   params: Record<string, string>,
 ): NextResponse {
-  const url = new URL("/setup", appUrl);
+  const url = new URL("/join", appUrl);
   for (const [key, value] of Object.entries(params)) {
     url.searchParams.set(key, value);
   }
@@ -26,7 +35,7 @@ export async function GET(request: NextRequest) {
   const appUrl = getAppUrl();
 
   if (error) {
-    return redirectToSetup(appUrl, { error });
+    return redirectToJoin(appUrl, { error });
   }
 
   const cookieStore = await cookies();
@@ -34,21 +43,35 @@ export async function GET(request: NextRequest) {
   cookieStore.delete(STATE_COOKIE);
 
   if (!code || !state || !savedState || state !== savedState) {
-    return redirectToSetup(appUrl, { error: "invalid_oauth_state" });
+    return redirectToJoin(appUrl, { error: "invalid_oauth_state" });
+  }
+
+  const pending = await getPendingJoin();
+  if (!pending) {
+    return redirectToJoin(appUrl, { error: "session_expired" });
   }
 
   try {
-    await exchangeCodeForTokens(code);
+    const tokens = await exchangeCodeForTokens(code);
+    await createProfileFromJoin(pending, tokens);
+    await clearPendingJoin();
+
     try {
-      await fetchAndStoreIdentity();
+      await fetchAndStoreIdentityForProfile(pending.slug);
     } catch {
-      // identity is optional; tokens are enough for health data
+      // optional
     }
-    return redirectToSetup(appUrl, { connected: "1" });
+
+    const capabilities = await probeDashboardCapabilities(pending.slug);
+    await updateProfileCapabilities(pending.slug, capabilities);
+
+    return NextResponse.redirect(
+      `${appUrl}/p/${pending.slug}?joined=1`,
+    );
   } catch (err) {
     const detail =
       err instanceof Error ? err.message : "Unknown token exchange error";
-    return redirectToSetup(appUrl, {
+    return redirectToJoin(appUrl, {
       error: "token_exchange_failed",
       detail: detail.slice(0, 300),
     });
