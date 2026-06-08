@@ -10,10 +10,10 @@ export async function GET() {
   }
 
   try {
-    const device = await fetchDeviceStatusCached();
-    return NextResponse.json({ device, fetchedAt: new Date().toISOString() });
+    const result = await fetchDeviceStatusCached();
+    return NextResponse.json({ ...result, fetchedAt: new Date().toISOString() });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ device: null, error: message }, { status: 500 });
   }
 }

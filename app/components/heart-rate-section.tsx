@@ -1,5 +1,7 @@
 import type { RestingHeartRateDay } from "@/lib/google-health/data";
+import type { DeviceFetchResult } from "@/lib/google-health/device";
 import type { StepsDay } from "@/lib/google-health/steps";
+import { DeviceBatteryCard } from "./device-battery-card";
 import { LiveHeartRate } from "./live-heart-rate";
 import { MetricCard } from "./metric-card";
 import { TodaySteps } from "./today-steps";
@@ -16,14 +18,17 @@ function formatDateLabel(date: string): string {
 export function HeartRateSection({
   days,
   steps,
+  deviceStatus,
 }: {
   days: RestingHeartRateDay[];
   steps: StepsDay[];
+  deviceStatus: DeviceFetchResult;
 }) {
   const latest = days[0];
 
   return (
     <section className="space-y-8">
+      <DeviceBatteryCard initial={deviceStatus} />
       <LiveHeartRate />
       <TodaySteps history={steps} />
 

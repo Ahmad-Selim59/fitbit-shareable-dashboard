@@ -53,7 +53,22 @@ type RollUpResponse = {
 const CONTEXT_HOURS = 24;
 const LIVE_THRESHOLD_MS = 5 * 60 * 1000;
 const DAY_BUCKET_SECONDS = 3600;
-const PAGE_SIZE = 1000;
+/** Google heart-rate rollUp: windowSize × pageSize must not exceed 14 days. */
+const HEART_RATE_MAX_ROLLUP_SEC = API_MAX_HEART_RATE_DAYS * 24 * 3600;
+
+function rollupPageSize(
+  windowSeconds: number,
+  rangeStart: Date,
+  rangeEnd: Date,
+): number {
+  const maxByPolicy = Math.floor(HEART_RATE_MAX_ROLLUP_SEC / windowSeconds);
+  const rangeSec = Math.max(
+    1,
+    Math.ceil((rangeEnd.getTime() - rangeStart.getTime()) / 1000),
+  );
+  const bucketsNeeded = Math.ceil(rangeSec / windowSeconds);
+  return Math.min(bucketsNeeded, maxByPolicy, 1000);
+}
 
 function clampWindowHours(hours: number): HeartRateWindowHours {
   const allowed = HEART_RATE_WINDOW_OPTIONS as readonly number[];
@@ -103,6 +118,7 @@ async function fetchHeartRateRollup(
 ): Promise<LiveHeartRateSample[]> {
   const samples: LiveHeartRateSample[] = [];
   let pageToken: string | undefined;
+  const pageSize = rollupPageSize(windowSeconds, start, end);
 
   do {
     const body: Record<string, unknown> = {
@@ -111,7 +127,7 @@ async function fetchHeartRateRollup(
         endTime: end.toISOString(),
       },
       windowSize: `${windowSeconds}s`,
-      pageSize: PAGE_SIZE,
+      pageSize,
     };
     if (pageToken) body.pageToken = pageToken;
 

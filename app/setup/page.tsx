@@ -126,9 +126,9 @@ export default async function SetupPage({
             .
           </p>
           <p className="mt-3 text-xs text-zinc-500">
-            Steps and Fitbit battery need activity + profile scopes. If those
-            are new, add them under Google Cloud → Data Access, then
-            disconnect and connect again here.
+            Steps need the activity scope; Fitbit battery needs the settings
+            scope. Add both in Google Cloud → Data Access, then disconnect and
+            connect again here.
           </p>
 
           <div className="mt-6 flex flex-wrap items-center gap-3">
