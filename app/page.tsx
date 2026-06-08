@@ -1,8 +1,10 @@
+import { DeviceBatteryBanner } from "./components/device-battery-banner";
 import { HeartRateSection } from "./components/heart-rate-section";
 import { SleepSection } from "./components/sleep-section";
 import { SpO2Section } from "./components/spo2-section";
 import { getConnectionStatus } from "@/lib/google-health/client";
 import { fetchDashboardDataCached } from "@/lib/google-health/data";
+import { fetchStepsDaysCached } from "@/lib/google-health/steps";
 
 export const dynamic = "force-dynamic";
 
@@ -18,10 +20,12 @@ export default async function Home() {
             Health dashboard
           </h1>
           <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            Personal heart rate, sleep, and SpO₂
+            Personal heart rate, steps, sleep, and SpO₂
           </p>
         </div>
       </header>
+
+      {connected && <DeviceBatteryBanner />}
 
       <main className="mx-auto max-w-5xl space-y-10 px-4 py-8 sm:px-6">
         {status.configured && !status.working && (
@@ -61,14 +65,17 @@ export default async function Home() {
 
 async function DashboardContent() {
   try {
-    const data = await fetchDashboardDataCached(7);
+    const [data, steps] = await Promise.all([
+      fetchDashboardDataCached(7),
+      fetchStepsDaysCached(7),
+    ]);
 
     return (
       <>
         <p className="text-sm text-zinc-500">
           Showing {data.range.start} → {data.range.end}
         </p>
-        <HeartRateSection days={data.restingHeartRate} />
+        <HeartRateSection days={data.restingHeartRate} steps={steps} />
         <SleepSection logs={data.sleep} />
         <SpO2Section days={data.spo2} />
       </>

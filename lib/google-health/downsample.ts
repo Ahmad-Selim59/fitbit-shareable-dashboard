@@ -1,4 +1,4 @@
-import type { LiveHeartRateSample } from "./heart-rate-live";
+import type { LiveHeartRateSample } from "./heart-rate-types";
 
 /** Average BPM per fixed time bucket (chronological order). */
 export function downsampleHeartRate(

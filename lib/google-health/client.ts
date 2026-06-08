@@ -76,7 +76,10 @@ export async function getConnectionStatus(): Promise<ConnectionStatus> {
   };
 }
 
-export async function healthFetch<T>(path: string): Promise<T> {
+export async function healthFetch<T>(
+  path: string,
+  init: RequestInit = {},
+): Promise<T> {
   let tokens = await getValidTokens();
   if (!tokens) {
     throw new Error("NOT_CONNECTED");
@@ -86,21 +89,27 @@ export async function healthFetch<T>(path: string): Promise<T> {
     ? path
     : `${HEALTH_API_BASE}${path.startsWith("/") ? path : `/${path}`}`;
 
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${tokens.accessToken}`,
+    Accept: "application/json",
+    ...(init.headers as Record<string, string> | undefined),
+  };
+  if (init.body && !headers["Content-Type"]) {
+    headers["Content-Type"] = "application/json";
+  }
+
   let response = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${tokens.accessToken}`,
-      Accept: "application/json",
-    },
+    ...init,
+    headers,
     cache: "no-store",
   });
 
   if (response.status === 401 && tokens.refreshToken) {
     tokens = await refreshAccessToken(tokens.refreshToken);
+    headers.Authorization = `Bearer ${tokens.accessToken}`;
     response = await fetch(url, {
-      headers: {
-        Authorization: `Bearer ${tokens.accessToken}`,
-        Accept: "application/json",
-      },
+      ...init,
+      headers,
       cache: "no-store",
     });
   }

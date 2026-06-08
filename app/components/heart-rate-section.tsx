@@ -1,6 +1,8 @@
 import type { RestingHeartRateDay } from "@/lib/google-health/data";
+import type { StepsDay } from "@/lib/google-health/steps";
 import { LiveHeartRate } from "./live-heart-rate";
 import { MetricCard } from "./metric-card";
+import { TodaySteps } from "./today-steps";
 
 function formatDateLabel(date: string): string {
   const d = new Date(`${date}T12:00:00`);
@@ -13,14 +15,17 @@ function formatDateLabel(date: string): string {
 
 export function HeartRateSection({
   days,
+  steps,
 }: {
   days: RestingHeartRateDay[];
+  steps: StepsDay[];
 }) {
   const latest = days[0];
 
   return (
     <section className="space-y-8">
       <LiveHeartRate />
+      <TodaySteps history={steps} />
 
       <div className="space-y-4">
       <div>

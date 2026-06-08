@@ -125,6 +125,11 @@ export default async function SetupPage({
               : " in .data/google-health-tokens.json locally"}
             .
           </p>
+          <p className="mt-3 text-xs text-zinc-500">
+            Steps and Fitbit battery need activity + profile scopes. If those
+            are new, add them under Google Cloud → Data Access, then
+            disconnect and connect again here.
+          </p>
 
           <div className="mt-6 flex flex-wrap items-center gap-3">
             <ConnectGoogle
