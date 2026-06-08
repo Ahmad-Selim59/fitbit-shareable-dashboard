@@ -8,7 +8,7 @@ import { setAdminSession } from "@/lib/profiles/auth-cookies";
 export async function POST(request: Request) {
   if (!getConfiguredAdminPassword()) {
     return NextResponse.json(
-      { error: "ADMIN_PASSWORD_ENC (or ADMIN_PASSWORD) not configured" },
+      { error: "ADMIN_PASSWORD not configured" },
       { status: 503 },
     );
   }

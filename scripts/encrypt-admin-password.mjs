@@ -27,4 +27,4 @@ const tag = cipher.getAuthTag();
 const payload = `${iv.toString("hex")}:${tag.toString("hex")}:${encrypted.toString("hex")}`;
 
 console.log("Add to .env.local or Vercel:");
-console.log(`ADMIN_PASSWORD_ENC=${payload}`);
+console.log(`ADMIN_PASSWORD=${payload}`);

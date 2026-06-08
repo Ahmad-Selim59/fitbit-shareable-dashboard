@@ -2,16 +2,13 @@ import { timingSafeEqual } from "crypto";
 import { decryptSecret, encryptSecret } from "@/lib/crypto/tokens";
 
 export function getConfiguredAdminPassword(): string | null {
-  const encrypted = process.env.ADMIN_PASSWORD_ENC?.trim();
-  if (encrypted) {
-    try {
-      return decryptSecret(encrypted);
-    } catch {
-      return null;
-    }
+  const encrypted = process.env.ADMIN_PASSWORD?.trim();
+  if (!encrypted) return null;
+  try {
+    return decryptSecret(encrypted);
+  } catch {
+    return null;
   }
-  const plain = process.env.ADMIN_PASSWORD?.trim();
-  return plain || null;
 }
 
 export function verifySuperAdminPassword(submitted: string): boolean {
