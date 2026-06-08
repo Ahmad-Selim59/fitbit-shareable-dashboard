@@ -37,7 +37,15 @@ export function LiveHeartRate() {
   const [data, setData] = useState<LiveHeartRateData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [selected, setSelected] = useState<LiveHeartRateSample | null>(null);
+  const [pinned, setPinned] = useState<LiveHeartRateSample | null>(null);
+  const [hovered, setHovered] = useState<LiveHeartRateSample | null>(null);
+  const [hoverCapable, setHoverCapable] = useState(false);
+
+  useEffect(() => {
+    setHoverCapable(
+      window.matchMedia("(hover: hover) and (pointer: fine)").matches,
+    );
+  }, []);
 
   const load = useCallback(async () => {
     try {
@@ -70,6 +78,7 @@ export function LiveHeartRate() {
   const maxBpm = bpms.length ? Math.max(...bpms) : 0;
   const bpmRange = Math.max(maxBpm - minBpm, 12);
   const bucketSec = data?.chartBucketSeconds ?? 40;
+  const displayed = pinned ?? hovered;
 
   return (
     <div className="rounded-2xl border border-teal-200 bg-gradient-to-br from-teal-50 to-white p-6 dark:border-teal-900 dark:from-teal-950 dark:to-zinc-950">
@@ -133,53 +142,64 @@ export function LiveHeartRate() {
               <span>{minBpm}</span>
             </div>
             <div
-              className="flex h-28 min-w-0 flex-1 items-end gap-0.5 overflow-hidden rounded-lg bg-zinc-100 p-2 dark:bg-zinc-900"
+              className="flex h-28 min-w-0 flex-1 items-end gap-px overflow-hidden rounded-lg bg-zinc-100 p-2 dark:bg-zinc-900"
               role="list"
               aria-label="Heart rate trend chart"
+              onMouseLeave={hoverCapable ? () => setHovered(null) : undefined}
             >
               {chart.map((s) => {
                 const pct = ((s.bpm - minBpm) / bpmRange) * 100;
-                const isSelected = selected?.at === s.at;
+                const isActive = displayed?.at === s.at;
                 return (
                   <button
                     key={s.at}
                     type="button"
                     role="listitem"
                     aria-label={`${s.bpm} beats per minute around ${formatTime(s.at, true)}`}
-                    aria-pressed={isSelected}
+                    aria-pressed={pinned?.at === s.at}
                     onClick={() =>
-                      setSelected((prev) => (prev?.at === s.at ? null : s))
+                      setPinned((prev) => (prev?.at === s.at ? null : s))
                     }
-                    onMouseEnter={() => setSelected(s)}
-                    className={`min-h-[44px] min-w-[3px] max-w-[12px] flex-1 self-end rounded-sm transition-colors touch-manipulation ${
-                      isSelected
-                        ? "bg-teal-800 ring-2 ring-teal-400 ring-offset-1 dark:bg-teal-300 dark:ring-teal-600"
-                        : "bg-teal-600 hover:bg-teal-500 dark:bg-teal-400 dark:hover:bg-teal-300"
-                    }`}
-                    style={{ height: `${Math.max(6, pct)}%` }}
-                  />
+                    onMouseEnter={
+                      hoverCapable ? () => setHovered(s) : undefined
+                    }
+                    className="flex min-h-[44px] min-w-0 flex-1 items-end justify-center self-stretch touch-manipulation"
+                  >
+                    <span
+                      aria-hidden
+                      className={`block w-full max-w-[10px] rounded-sm transition-colors ${
+                        isActive
+                          ? "bg-teal-800 ring-2 ring-teal-400 ring-offset-1 dark:bg-teal-300 dark:ring-teal-600"
+                          : "bg-teal-600 hover:bg-teal-500 dark:bg-teal-400 dark:hover:bg-teal-300"
+                      }`}
+                      style={{ height: `${Math.max(6, pct)}%` }}
+                    />
+                  </button>
                 );
               })}
             </div>
           </div>
           <p className="mt-1 text-[10px] text-zinc-400">Older ← → now</p>
 
-          {selected ? (
+          {displayed ? (
             <div className="mt-3 rounded-lg border border-teal-200 bg-white px-4 py-3 dark:border-teal-800 dark:bg-zinc-950">
               <p className="text-lg font-semibold tabular-nums text-teal-700 dark:text-teal-300">
-                {selected.bpm} bpm
+                {displayed.bpm} bpm
               </p>
               <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-                {formatDateTime(selected.at)}
+                {formatDateTime(displayed.at)}
               </p>
               <p className="mt-0.5 text-xs text-zinc-500">
-                ~{bucketSec}s average for this bar · tap again to clear
+                ~{bucketSec}s average for this bar
+                {pinned?.at === displayed.at
+                  ? " · tap again to clear"
+                  : " · tap to pin"}
               </p>
             </div>
           ) : (
             <p className="mt-3 text-xs text-zinc-500">
-              Tap any bar on mobile (or hover on desktop) to see exact BPM and
-              time — no extra network request.
+              Tap a bar to see exact BPM and time (hover on desktop for a
+              preview) — no extra network request.
             </p>
           )}
         </div>
