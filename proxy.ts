@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 const AUTH_COOKIE = "dashboard_auth";
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const password = process.env.DASHBOARD_PASSWORD;
   if (!password) {
     return NextResponse.next();
