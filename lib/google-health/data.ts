@@ -1,8 +1,8 @@
 import { healthFetch } from "./client";
 import { CACHE_TTL, withCache } from "./cache";
-import { queryDateRange } from "./dates";
+import { queryDateRange, civilDateTimeToString } from "./dates";
 
-type CivilDateTime = { date?: string; time?: string };
+type CivilDateTime = { date?: string | { year?: number; month?: number; day?: number }; time?: string };
 type HealthDate = { year?: number; month?: number; day?: number };
 
 type DataPoint = {
@@ -83,8 +83,7 @@ function healthDateToString(d?: HealthDate): string | null {
 }
 
 function civilDateToString(c?: CivilDateTime): string | null {
-  if (!c?.date) return null;
-  return c.date.slice(0, 10);
+  return civilDateTimeToString(c);
 }
 
 function parseIntField(value?: string): number {

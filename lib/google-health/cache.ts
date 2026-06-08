@@ -44,6 +44,10 @@ export function isSuccessfulCacheResult(value: unknown): boolean {
     if ("chartSamples" in o && Array.isArray(o.chartSamples)) {
       return o.chartSamples.length > 0;
     }
+
+    if ("days" in o && Array.isArray(o.days)) {
+      return o.days.length > 0;
+    }
   }
 
   return true;

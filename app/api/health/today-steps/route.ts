@@ -10,8 +10,13 @@ export async function GET() {
   }
 
   try {
-    const today = await fetchTodaySteps();
-    return NextResponse.json({ today, fetchedAt: new Date().toISOString() });
+    const { today, days, error } = await fetchTodaySteps();
+    return NextResponse.json({
+      today,
+      days,
+      error,
+      fetchedAt: new Date().toISOString(),
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     return NextResponse.json({ error: message }, { status: 500 });

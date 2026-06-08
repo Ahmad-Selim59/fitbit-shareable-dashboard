@@ -4,7 +4,7 @@ import { SpO2Section } from "./components/spo2-section";
 import { getConnectionStatus } from "@/lib/google-health/client";
 import { fetchDashboardDataCached } from "@/lib/google-health/data";
 import { fetchDeviceStatusCached } from "@/lib/google-health/device";
-import { fetchStepsDays } from "@/lib/google-health/steps";
+import { fetchStepsHistoryCached, fetchTodaySteps } from "@/lib/google-health/steps";
 
 export const dynamic = "force-dynamic";
 
@@ -63,11 +63,14 @@ export default async function Home() {
 
 async function DashboardContent() {
   try {
-    const [data, steps, deviceStatus] = await Promise.all([
+    const [data, stepsHistory, todaySteps, deviceStatus] = await Promise.all([
       fetchDashboardDataCached(7),
-      fetchStepsDays(7),
+      fetchStepsHistoryCached(7),
+      fetchTodaySteps(),
       fetchDeviceStatusCached(),
     ]);
+
+    const stepsError = todaySteps.error ?? stepsHistory.error;
 
     return (
       <>
@@ -76,7 +79,9 @@ async function DashboardContent() {
         </p>
         <HeartRateSection
           days={data.restingHeartRate}
-          steps={steps}
+          stepsHistory={stepsHistory.days}
+          initialToday={todaySteps.today}
+          stepsError={stepsError}
           deviceStatus={deviceStatus}
         />
         <SleepSection logs={data.sleep} />

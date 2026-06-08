@@ -17,11 +17,15 @@ function formatDateLabel(date: string): string {
 
 export function HeartRateSection({
   days,
-  steps,
+  stepsHistory,
+  initialToday,
+  stepsError,
   deviceStatus,
 }: {
   days: RestingHeartRateDay[];
-  steps: StepsDay[];
+  stepsHistory: StepsDay[];
+  initialToday: StepsDay | null;
+  stepsError?: string;
   deviceStatus: DeviceFetchResult;
 }) {
   const latest = days[0];
@@ -30,7 +34,11 @@ export function HeartRateSection({
     <section className="space-y-8">
       <DeviceBatteryCard initial={deviceStatus} />
       <LiveHeartRate />
-      <TodaySteps history={steps} />
+      <TodaySteps
+        history={stepsHistory}
+        initialToday={initialToday}
+        initialError={stepsError}
+      />
 
       <div className="space-y-4">
       <div>

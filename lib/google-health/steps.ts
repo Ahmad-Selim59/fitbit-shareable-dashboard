@@ -1,14 +1,24 @@
 import { healthFetch } from "./client";
-import { queryDateRange } from "./dates";
+import { withCache } from "./cache";
+import {
+  civilDateTimeToString,
+  localTodayDateKey,
+  msUntilLocalMidnight,
+  nextDayAfter,
+  queryDateRange,
+  toCivilDateRequest,
+  type CivilDateTime,
+} from "./dates";
 
-type CivilDateTime = { date?: string };
 type StepsRollupPoint = {
   civilStartTime?: CivilDateTime;
-  steps?: { countSum?: string };
+  civil_start_time?: CivilDateTime;
+  steps?: { countSum?: string; count_sum?: string };
 };
 
 type DailyRollUpResponse = {
   rollupDataPoints?: StepsRollupPoint[];
+  rollup_data_points?: StepsRollupPoint[];
 };
 
 export type StepsDay = {
@@ -16,52 +26,87 @@ export type StepsDay = {
   steps: number;
 };
 
-function civilDateToString(c?: CivilDateTime): string | null {
-  if (!c?.date) return null;
-  return c.date.slice(0, 10);
-}
+export type StepsFetchResult = {
+  days: StepsDay[];
+  error?: string;
+};
+
+export type TodayStepsResult = StepsFetchResult & {
+  today: StepsDay | null;
+};
+
+const HISTORY_DAYS = 7;
 
 function normalizeStepsRollup(points: StepsRollupPoint[]): StepsDay[] {
   return points
     .map((p) => {
-      const date = civilDateToString(p.civilStartTime);
-      const steps = parseInt(p.steps?.countSum ?? "0", 10);
-      return { date: date ?? "", steps };
+      const civil = p.civilStartTime ?? p.civil_start_time;
+      const date = civilDateTimeToString(civil);
+      const stepsRaw = p.steps?.countSum ?? p.steps?.count_sum ?? "0";
+      const steps = parseInt(stepsRaw, 10);
+      return { date: date ?? "", steps: Number.isNaN(steps) ? 0 : steps };
     })
     .filter((row) => row.date)
     .sort((a, b) => b.date.localeCompare(a.date));
 }
 
-async function fetchStepsRollup(days: number): Promise<StepsDay[]> {
-  const range = queryDateRange(days);
+async function fetchStepsRollupRange(
+  startDate: string,
+  endExclusiveDate: string,
+): Promise<StepsDay[]> {
   const res = await healthFetch<DailyRollUpResponse>(
     "/v4/users/me/dataTypes/steps/dataPoints:dailyRollUp",
     {
       method: "POST",
       body: JSON.stringify({
         range: {
-          start: { date: range.start },
-          end: { date: range.endExclusive },
+          start: toCivilDateRequest(startDate),
+          end: toCivilDateRequest(endExclusiveDate),
         },
         windowSizeDays: 1,
       }),
     },
   );
-  return normalizeStepsRollup(res.rollupDataPoints ?? []);
+  const points = res.rollupDataPoints ?? res.rollup_data_points ?? [];
+  return normalizeStepsRollup(points);
 }
 
-/** Always fetches fresh — not server-cached. */
-export async function fetchStepsDays(days = 7): Promise<StepsDay[]> {
+/** Past days only — excludes today. Cached on server until local midnight. */
+export async function fetchStepsHistory(
+  days = HISTORY_DAYS,
+): Promise<StepsFetchResult> {
+  const todayKey = localTodayDateKey();
   try {
-    return await fetchStepsRollup(days);
+    const range = queryDateRange(days);
+    const rows = await fetchStepsRollupRange(range.start, range.endExclusive);
+    return { days: rows.filter((d) => d.date !== todayKey) };
   } catch (err) {
-    console.error("[google-health] steps:", err);
-    return [];
+    const message = err instanceof Error ? err.message : "Failed to load steps";
+    console.error("[google-health] steps history:", message);
+    return { days: [], error: message };
   }
 }
 
-/** Always fetches fresh — not server-cached. */
-export async function fetchTodaySteps(): Promise<StepsDay | null> {
-  const days = await fetchStepsDays(1);
-  return days[0] ?? null;
+export function fetchStepsHistoryCached(
+  days = HISTORY_DAYS,
+): Promise<StepsFetchResult> {
+  return withCache(
+    `steps-history:${days}`,
+    msUntilLocalMidnight(),
+    () => fetchStepsHistory(days),
+  );
+}
+
+/** Today only — always fetched fresh, never cached. */
+export async function fetchTodaySteps(): Promise<TodayStepsResult> {
+  const todayKey = localTodayDateKey();
+  try {
+    const rows = await fetchStepsRollupRange(todayKey, nextDayAfter(todayKey));
+    const today = rows.find((d) => d.date === todayKey) ?? rows[0] ?? null;
+    return { days: today ? [today] : [], today };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to load steps";
+    console.error("[google-health] steps today:", message);
+    return { days: [], today: null, error: message };
+  }
 }
