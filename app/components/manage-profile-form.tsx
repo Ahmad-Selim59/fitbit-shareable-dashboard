@@ -9,16 +9,27 @@ import {
   type WatchType,
 } from "@/lib/watch-config";
 
+const RECONNECT_ERROR_MESSAGES: Record<string, string> = {
+  access_denied: "Google authorization was cancelled.",
+  invalid_oauth_state: "OAuth state mismatch. Try reconnect again.",
+  token_exchange_failed: "Could not exchange the authorization code.",
+  session_expired: "Reconnect session expired. Try again.",
+};
+
 export function ManageProfileForm({
   slug,
   watchType: initialWatchType,
   capabilities: initialCapabilities,
   hasViewerPassword: initialHasViewerPassword,
+  oauthError,
+  oauthErrorDetail,
 }: {
   slug: string;
   watchType: WatchType;
   capabilities: DashboardCapabilities | null;
   hasViewerPassword: boolean;
+  oauthError?: string;
+  oauthErrorDetail?: string;
 }) {
   const router = useRouter();
   const [adminPassword, setAdminPassword] = useState("");
@@ -145,6 +156,33 @@ export function ManageProfileForm({
     }
   }
 
+  async function reconnectGoogle() {
+    if (!adminPassword) {
+      setError("Enter your admin password first.");
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const res = await fetch(`/api/profiles/${slug}/reconnect/start`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ adminPassword }),
+      });
+      const json = (await res.json()) as {
+        redirectUrl?: string;
+        error?: string;
+      };
+      if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
+      if (!json.redirectUrl) throw new Error("Missing redirect URL");
+      window.location.href = json.redirectUrl;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Reconnect failed");
+      setLoading(false);
+    }
+  }
+
   async function deleteProfile() {
     if (!confirm("Delete this profile permanently? This cannot be undone.")) {
       return;
@@ -256,6 +294,24 @@ export function ManageProfileForm({
         </button>
       </div>
 
+      <div className="space-y-3 rounded-xl border border-teal-200 bg-teal-50/50 p-4 dark:border-teal-900 dark:bg-teal-950/30">
+        <p className="text-sm font-medium text-zinc-800 dark:text-zinc-200">
+          Google Health connection
+        </p>
+        <p className="text-xs text-zinc-600 dark:text-zinc-400">
+          Re-authorize if the dashboard shows disconnected or stops loading
+          data. Your slug, passwords, and settings are kept.
+        </p>
+        <button
+          type="button"
+          onClick={reconnectGoogle}
+          disabled={loading || !adminPassword}
+          className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-500 disabled:opacity-60"
+        >
+          Reconnect Google
+        </button>
+      </div>
+
       <div className="space-y-2">
         <label className="text-sm font-medium text-zinc-800 dark:text-zinc-200">
           Watch type
@@ -314,6 +370,19 @@ export function ManageProfileForm({
           </ul>
         )}
       </div>
+
+      {oauthError && (
+        <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-800 dark:bg-red-950 dark:text-red-200">
+          <p>
+            {RECONNECT_ERROR_MESSAGES[oauthError] ?? `Error: ${oauthError}`}
+          </p>
+          {oauthErrorDetail && (
+            <p className="mt-1 break-all font-mono text-xs opacity-90">
+              {oauthErrorDetail}
+            </p>
+          )}
+        </div>
+      )}
 
       {message && <p className="text-sm text-teal-700 dark:text-teal-300">{message}</p>}
       {error && <p className="text-sm text-red-600">{error}</p>}

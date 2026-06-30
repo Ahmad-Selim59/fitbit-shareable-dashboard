@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { ProfileDashboard } from "@/app/components/profile-dashboard";
+import { GoogleHealthDisconnectedNotice } from "@/app/components/google-health-disconnected-notice";
+import { GoogleOAuthTestingNotice } from "@/app/components/google-oauth-testing-notice";
 import { RecordProfileVisit } from "@/app/components/record-profile-visit";
+import { isProfileConnected } from "@/lib/google-health/client";
 import { requireProfileForView } from "@/lib/profiles/access";
 import { profileRequiresViewerPassword } from "@/lib/profiles/store";
 
@@ -11,11 +14,12 @@ export default async function ProfilePage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ joined?: string }>;
+  searchParams: Promise<{ joined?: string; reconnected?: string }>;
 }) {
   const { slug } = await params;
   const query = await searchParams;
   const profile = await requireProfileForView(slug);
+  const connected = await isProfileConnected(slug);
 
   return (
     <div className="min-h-full bg-zinc-50 dark:bg-zinc-950">
@@ -49,7 +53,14 @@ export default async function ProfilePage({
             .
           </div>
         )}
-        <ProfileDashboard profile={profile} />
+        {query.reconnected === "1" && (
+          <div className="rounded-lg bg-teal-50 px-4 py-3 text-sm text-teal-800 dark:bg-teal-950 dark:text-teal-200">
+            Google Health reconnected. Your dashboard should load data again.
+          </div>
+        )}
+        {!connected && <GoogleHealthDisconnectedNotice slug={slug} />}
+        <GoogleOAuthTestingNotice />
+        <ProfileDashboard profile={profile} connected={connected} />
         <p className="text-xs text-zinc-500">
           <Link href={`/p/${slug}/manage`} className="underline">
             Manage profile

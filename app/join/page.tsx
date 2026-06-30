@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { JoinForm } from "../components/join-form";
+import { GoogleOAuthTestingNotice } from "../components/google-oauth-testing-notice";
 import { SamsungSetupChecklist } from "../components/samsung-setup-checklist";
 
 const ERROR_MESSAGES: Record<string, string> = {
@@ -33,6 +34,7 @@ export default async function JoinPage({
       </header>
 
       <main className="mx-auto max-w-lg space-y-6 px-4 py-8 sm:px-6">
+        <GoogleOAuthTestingNotice />
         {params.error && (
           <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-800 dark:bg-red-950 dark:text-red-200">
             <p>{ERROR_MESSAGES[params.error] ?? `Error: ${params.error}`}</p>

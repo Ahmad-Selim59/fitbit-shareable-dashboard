@@ -6,10 +6,14 @@ import { probeDashboardCapabilities } from "@/lib/google-health/capabilities";
 import { exchangeCodeForTokens } from "@/lib/google-health/oauth";
 import {
   clearPendingJoin,
+  clearPendingReconnect,
   getPendingJoin,
+  getPendingReconnect,
 } from "@/lib/profiles/auth-cookies";
 import {
   createProfileFromJoin,
+  getProfileBySlug,
+  saveTokensForProfile,
   updateProfileCapabilities,
 } from "@/lib/profiles/store";
 
@@ -26,6 +30,18 @@ function redirectToJoin(
   return NextResponse.redirect(url);
 }
 
+function redirectToManage(
+  appUrl: string,
+  slug: string,
+  params: Record<string, string>,
+): NextResponse {
+  const url = new URL(`/p/${slug}/manage`, appUrl);
+  for (const [key, value] of Object.entries(params)) {
+    url.searchParams.set(key, value);
+  }
+  return NextResponse.redirect(url);
+}
+
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
   const code = searchParams.get("code");
@@ -33,8 +49,13 @@ export async function GET(request: NextRequest) {
   const error = searchParams.get("error");
 
   const appUrl = getAppUrl();
+  const pendingReconnect = await getPendingReconnect();
 
   if (error) {
+    if (pendingReconnect) {
+      await clearPendingReconnect();
+      return redirectToManage(appUrl, pendingReconnect.slug, { error });
+    }
     return redirectToJoin(appUrl, { error });
   }
 
@@ -43,7 +64,50 @@ export async function GET(request: NextRequest) {
   cookieStore.delete(STATE_COOKIE);
 
   if (!code || !state || !savedState || state !== savedState) {
+    if (pendingReconnect) {
+      await clearPendingReconnect();
+      return redirectToManage(appUrl, pendingReconnect.slug, {
+        error: "invalid_oauth_state",
+      });
+    }
     return redirectToJoin(appUrl, { error: "invalid_oauth_state" });
+  }
+
+  if (pendingReconnect) {
+    const profile = await getProfileBySlug(pendingReconnect.slug);
+    if (!profile) {
+      await clearPendingReconnect();
+      return redirectToJoin(appUrl, { error: "session_expired" });
+    }
+
+    try {
+      const tokens = await exchangeCodeForTokens(code);
+      await saveTokensForProfile(pendingReconnect.slug, tokens);
+      await clearPendingReconnect();
+
+      try {
+        await fetchAndStoreIdentityForProfile(pendingReconnect.slug);
+      } catch {
+        // optional
+      }
+
+      const capabilities = await probeDashboardCapabilities(
+        pendingReconnect.slug,
+      );
+      await updateProfileCapabilities(pendingReconnect.slug, capabilities);
+
+      return NextResponse.redirect(
+        `${appUrl}/p/${pendingReconnect.slug}?reconnected=1`,
+      );
+    } catch (err) {
+      await clearPendingReconnect();
+      const detail =
+        err instanceof Error ? err.message : "Unknown token exchange error";
+      return redirectToManage(appUrl, pendingReconnect.slug, {
+        error: "token_exchange_failed",
+        detail: detail.slice(0, 300),
+      });
+    }
   }
 
   const pending = await getPendingJoin();

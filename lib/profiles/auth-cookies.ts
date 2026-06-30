@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import type { PendingJoin } from "./types";
 
 const PENDING_JOIN_COOKIE = "pending_join";
+const PENDING_RECONNECT_COOKIE = "pending_reconnect";
 const ADMIN_SESSION_COOKIE = "admin_session";
 const PENDING_TTL_SEC = 600;
 const UNLOCK_TTL_SEC = 60 * 60 * 24 * 30;
@@ -74,6 +75,40 @@ export async function getPendingJoin(): Promise<PendingJoin | null> {
 export async function clearPendingJoin(): Promise<void> {
   const cookieStore = await cookies();
   cookieStore.delete(PENDING_JOIN_COOKIE);
+}
+
+export async function setPendingReconnect(slug: string): Promise<void> {
+  const cookieStore = await cookies();
+  const payload = sign(
+    JSON.stringify({ slug, exp: Date.now() + PENDING_TTL_SEC * 1000 }),
+  );
+  cookieStore.set(PENDING_RECONNECT_COOKIE, payload, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge: PENDING_TTL_SEC,
+    path: "/",
+  });
+}
+
+export async function getPendingReconnect(): Promise<{ slug: string } | null> {
+  const cookieStore = await cookies();
+  const raw = cookieStore.get(PENDING_RECONNECT_COOKIE)?.value;
+  if (!raw) return null;
+  const verified = verifySigned(raw);
+  if (!verified) return null;
+  try {
+    const parsed = JSON.parse(verified) as { slug: string; exp: number };
+    if (parsed.exp < Date.now() || !parsed.slug) return null;
+    return { slug: parsed.slug };
+  } catch {
+    return null;
+  }
+}
+
+export async function clearPendingReconnect(): Promise<void> {
+  const cookieStore = await cookies();
+  cookieStore.delete(PENDING_RECONNECT_COOKIE);
 }
 
 export async function setProfileUnlock(slug: string): Promise<void> {

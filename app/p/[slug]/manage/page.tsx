@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ManageProfileForm } from "@/app/components/manage-profile-form";
+import { GoogleOAuthTestingNotice } from "@/app/components/google-oauth-testing-notice";
 import { getProfileOrNull } from "@/lib/profiles/access";
 import {
   getProfileCapabilities,
@@ -10,10 +11,13 @@ import { redirect } from "next/navigation";
 
 export default async function ManageProfilePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ error?: string; detail?: string }>;
 }) {
   const { slug } = await params;
+  const query = await searchParams;
   const profile = await getProfileOrNull(slug);
   if (!profile) {
     redirect("/?notfound=1");
@@ -32,13 +36,16 @@ export default async function ManageProfilePage({
         </div>
       </header>
 
-      <main className="mx-auto max-w-lg px-4 py-8 sm:px-6">
+      <main className="mx-auto max-w-lg space-y-4 px-4 py-8 sm:px-6">
+        <GoogleOAuthTestingNotice />
         <div className="rounded-2xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-950">
           <ManageProfileForm
             slug={slug}
             watchType={getProfileWatchType(profile)}
             capabilities={getProfileCapabilities(profile)}
             hasViewerPassword={profileRequiresViewerPassword(profile)}
+            oauthError={query.error}
+            oauthErrorDetail={query.detail}
           />
         </div>
       </main>

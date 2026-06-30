@@ -11,8 +11,17 @@ import {
 } from "@/lib/profiles/store";
 import { resolveEffectiveCapabilities } from "@/lib/watch-config";
 
-export async function ProfileDashboard({ profile }: { profile: ProfileRow }) {
+export async function ProfileDashboard({
+  profile,
+  connected = true,
+}: {
+  profile: ProfileRow;
+  connected?: boolean;
+}) {
   const slug = profile.slug;
+  if (!connected) {
+    return null;
+  }
   const watchType = getProfileWatchType(profile);
   const capabilities = resolveEffectiveCapabilities({
     watchType,

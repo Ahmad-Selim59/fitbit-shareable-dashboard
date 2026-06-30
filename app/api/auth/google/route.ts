@@ -2,7 +2,10 @@ import { randomBytes } from "crypto";
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { buildAuthorizeUrl } from "@/lib/google-health/oauth";
-import { getPendingJoin } from "@/lib/profiles/auth-cookies";
+import {
+  getPendingJoin,
+  getPendingReconnect,
+} from "@/lib/profiles/auth-cookies";
 
 const STATE_COOKIE = "google_oauth_state";
 
@@ -14,6 +17,15 @@ export async function GET(request: NextRequest) {
     if (!pending) {
       return NextResponse.redirect(
         new URL("/join?error=session_expired", request.url),
+      );
+    }
+  }
+
+  if (mode === "reconnect") {
+    const pending = await getPendingReconnect();
+    if (!pending) {
+      return NextResponse.redirect(
+        new URL("/?error=reconnect_session_expired", request.url),
       );
     }
   }
