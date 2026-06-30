@@ -108,6 +108,53 @@ function assertInRange(end: Date): void {
   }
 }
 
+function bucketHeartRateSamples(
+  points: HeartRatePoint[],
+  start: Date,
+  end: Date,
+  windowSeconds: number,
+): LiveHeartRateSample[] {
+  const buckets = new Map<number, number[]>();
+  for (const p of points) {
+    const hr = p.heartRate;
+    const at = hr?.sampleTime?.physicalTime;
+    const bpm = hr?.beatsPerMinute ? parseInt(hr.beatsPerMinute, 10) : 0;
+    if (!at || bpm <= 0) continue;
+    const t = new Date(at).getTime();
+    if (t < start.getTime() || t >= end.getTime()) continue;
+    const key =
+      Math.floor((t - start.getTime()) / 1000 / windowSeconds) * windowSeconds +
+      Math.floor(start.getTime() / 1000);
+    const list = buckets.get(key) ?? [];
+    list.push(bpm);
+    buckets.set(key, list);
+  }
+  return [...buckets.entries()]
+    .map(([key, bpms]) => ({
+      bpm: Math.round(bpms.reduce((a, b) => a + b, 0) / bpms.length),
+      at: new Date(key * 1000).toISOString(),
+      minBpm: Math.min(...bpms),
+      maxBpm: Math.max(...bpms),
+    }))
+    .sort((a, b) => a.at.localeCompare(b.at));
+}
+
+async function fetchHeartRateRollupFromReconcile(
+  slug: string,
+  start: Date,
+  end: Date,
+  windowSeconds: number,
+): Promise<LiveHeartRateSample[]> {
+  const filter = `heart_rate.sample_time.physical_time >= "${start.toISOString()}" AND heart_rate.sample_time.physical_time < "${end.toISOString()}"`;
+  const points = await listAllReconciledDataPoints<HeartRatePoint>(
+    slug,
+    "heart-rate",
+    filter,
+    1000,
+  );
+  return bucketHeartRateSamples(points, start, end, windowSeconds);
+}
+
 async function fetchHeartRateRollup(
   slug: string,
   start: Date,
@@ -150,7 +197,21 @@ async function fetchHeartRateRollup(
     pageToken = res.nextPageToken;
   } while (pageToken);
 
-  return samples.sort((a, b) => a.at.localeCompare(b.at));
+  if (samples.length > 0) {
+    return samples.sort((a, b) => a.at.localeCompare(b.at));
+  }
+
+  try {
+    return await fetchHeartRateRollupFromReconcile(
+      slug,
+      start,
+      end,
+      windowSeconds,
+    );
+  } catch (err) {
+    console.error("[google-health] heart-rate reconcile fallback:", err);
+    return [];
+  }
 }
 
 function fetchRollupCached(

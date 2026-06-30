@@ -34,6 +34,10 @@ type DataPoint = {
     lowerBoundPercentage?: number;
     upperBoundPercentage?: number;
   };
+  oxygenSaturation?: {
+    sampleTime?: { physicalTime?: string };
+    percentage?: number;
+  };
 };
 
 export type RestingHeartRateDay = {
@@ -161,6 +165,53 @@ function normalizeSpO2(points: DataPoint[]): SpO2DayView[] {
     .sort((a, b) => b.date.localeCompare(a.date));
 }
 
+function normalizeSpO2FromSamples(points: DataPoint[]): SpO2DayView[] {
+  const byDate = new Map<string, number[]>();
+  for (const p of points) {
+    const o = p.oxygenSaturation;
+    const at = o?.sampleTime?.physicalTime;
+    const pct = o?.percentage;
+    if (!at || pct == null || pct <= 0) continue;
+    const date = at.slice(0, 10);
+    const list = byDate.get(date) ?? [];
+    list.push(pct);
+    byDate.set(date, list);
+  }
+  return [...byDate.entries()]
+    .map(([date, values]) => ({
+      date,
+      avg: Math.round(values.reduce((a, b) => a + b, 0) / values.length),
+      min: Math.min(...values),
+      max: Math.max(...values),
+    }))
+    .sort((a, b) => b.date.localeCompare(a.date));
+}
+
+function mergeSleepPoints(a: DataPoint[], b: DataPoint[]): DataPoint[] {
+  const seen = new Set<string>();
+  const merged: DataPoint[] = [];
+  for (const p of [...a, ...b]) {
+    const key = `${p.sleep?.interval?.startTime ?? ""}:${p.sleep?.interval?.endTime ?? ""}`;
+    if (!key || key === ":" || seen.has(key)) continue;
+    seen.add(key);
+    merged.push(p);
+  }
+  return merged;
+}
+
+async function fetchSleepPoints(
+  slug: string,
+  range: { start: string; endExclusive: string },
+): Promise<DataPoint[]> {
+  const civilFilter = `sleep.interval.civil_end_time >= "${range.start}" AND sleep.interval.civil_end_time < "${range.endExclusive}"`;
+  const endFilter = `sleep.interval.end_time >= "${range.start}T00:00:00Z" AND sleep.interval.end_time < "${range.endExclusive}T00:00:00Z"`;
+  const [byCivil, byEnd] = await Promise.all([
+    listAllReconciledDataPoints<DataPoint>(slug, "sleep", civilFilter, 25),
+    listAllReconciledDataPoints<DataPoint>(slug, "sleep", endFilter, 25),
+  ]);
+  return mergeSleepPoints(byCivil, byEnd);
+}
+
 async function fetchSafe(
   label: string,
   fn: () => Promise<DataPoint[]>,
@@ -180,10 +231,12 @@ export async function fetchDashboardData(
   const range = queryDateRange(days);
 
   const restingFilter = `daily_resting_heart_rate.date >= "${range.start}" AND daily_resting_heart_rate.date < "${range.endExclusive}"`;
-  const sleepFilter = `sleep.interval.civil_end_time >= "${range.start}" AND sleep.interval.civil_end_time < "${range.endExclusive}"`;
   const spo2Filter = `daily_oxygen_saturation.date >= "${range.start}" AND daily_oxygen_saturation.date < "${range.endExclusive}"`;
+  const spo2SampleEnd = new Date();
+  const spo2SampleStart = new Date(spo2SampleEnd.getTime() - days * 24 * 60 * 60 * 1000);
+  const spo2SampleFilter = `oxygen_saturation.sample_time.physical_time >= "${spo2SampleStart.toISOString()}" AND oxygen_saturation.sample_time.physical_time < "${spo2SampleEnd.toISOString()}"`;
 
-  const [restingRaw, sleepRaw, spo2Raw] = await Promise.all([
+  const [restingRaw, sleepRaw, spo2DailyRaw, spo2SampleRaw] = await Promise.all([
     fetchSafe("daily-resting-heart-rate", () =>
       listAllReconciledDataPoints<DataPoint>(
         slug,
@@ -191,9 +244,7 @@ export async function fetchDashboardData(
         restingFilter,
       ),
     ),
-    fetchSafe("sleep", () =>
-      listAllReconciledDataPoints<DataPoint>(slug, "sleep", sleepFilter, 25),
-    ),
+    fetchSafe("sleep", () => fetchSleepPoints(slug, range)),
     fetchSafe("daily-oxygen-saturation", () =>
       listAllReconciledDataPoints<DataPoint>(
         slug,
@@ -201,13 +252,25 @@ export async function fetchDashboardData(
         spo2Filter,
       ),
     ),
+    fetchSafe("oxygen-saturation", () =>
+      listAllReconciledDataPoints<DataPoint>(
+        slug,
+        "oxygen-saturation",
+        spo2SampleFilter,
+        100,
+      ),
+    ),
   ]);
+
+  const spo2Daily = normalizeSpO2(spo2DailyRaw);
+  const spo2 =
+    spo2Daily.length > 0 ? spo2Daily : normalizeSpO2FromSamples(spo2SampleRaw);
 
   return {
     range: { start: range.start, end: range.end },
     restingHeartRate: normalizeRestingHeartRate(restingRaw),
     sleep: normalizeSleep(sleepRaw),
-    spo2: normalizeSpO2(spo2Raw),
+    spo2,
   };
 }
 
@@ -216,7 +279,7 @@ export function fetchDashboardDataCached(
   days = 7,
 ): Promise<DashboardData> {
   return withCache(
-    profileCacheKey(slug, `dashboard:reconcile:${days}`),
+    profileCacheKey(slug, `dashboard:reconcile-v2:${days}`),
     CACHE_TTL.dailyMs,
     () => fetchDashboardData(slug, days),
   );

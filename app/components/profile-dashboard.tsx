@@ -1,4 +1,5 @@
 import { HeartRateSection } from "./heart-rate-section";
+import { SamsungCloudDataNotice } from "./samsung-cloud-data-notice";
 import { SleepSection } from "./sleep-section";
 import { SpO2Section } from "./spo2-section";
 import { fetchDashboardDataCached } from "@/lib/google-health/data";
@@ -37,9 +38,19 @@ export async function ProfileDashboard({
     ]);
 
     const stepsError = todaySteps.error ?? stepsHistory.error;
+    const hasSteps =
+      (todaySteps.today?.steps ?? 0) > 0 ||
+      stepsHistory.days.some((d) => d.steps > 0);
+    const showSamsungCloudLimit =
+      watchType === "samsung" &&
+      hasSteps &&
+      data.sleep.length === 0 &&
+      data.spo2.length === 0 &&
+      data.restingHeartRate.length === 0;
 
     return (
       <>
+        {showSamsungCloudLimit && <SamsungCloudDataNotice />}
         <p className="text-sm text-zinc-500">
           Showing {data.range.start} → {data.range.end}
         </p>

@@ -38,8 +38,21 @@ export function resolveEffectiveCapabilities(options: {
   probed: DashboardCapabilities | null;
 }): EffectiveCapabilities {
   const { watchType, probed } = options;
-  const base = probed ?? defaultCapabilitiesForWatch(watchType);
-  return { ...base };
+  if (!probed) return defaultCapabilitiesForWatch(watchType);
+
+  if (watchType === "samsung") {
+    return {
+      // Samsung does not share daily resting HR via Google Health cloud.
+      restingHeartRate: false,
+      liveHeartRate: true,
+      steps: probed.steps,
+      sleep: true,
+      spo2: true,
+      deviceBattery: false,
+    };
+  }
+
+  return { ...probed };
 }
 
 export function watchTypeLabel(watchType: WatchType): string {

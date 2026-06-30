@@ -45,6 +45,43 @@ export function ManageProfileForm({
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [probeResult, setProbeResult] = useState<{
+    counts: Record<string, number>;
+    notes: string[];
+  } | null>(null);
+
+  async function diagnoseHealthData() {
+    if (!adminPassword) {
+      setError("Enter your admin password first.");
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    setMessage(null);
+    setProbeResult(null);
+    try {
+      const res = await fetch(`/api/profiles/${slug}/health/debug`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ adminPassword }),
+      });
+      const json = (await res.json()) as {
+        counts?: Record<string, number>;
+        notes?: string[];
+        error?: string;
+      };
+      if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
+      setProbeResult({
+        counts: json.counts ?? {},
+        notes: json.notes ?? [],
+      });
+      setMessage("Google Health cloud probe complete.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Probe failed");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   async function recheckFeatures() {
     setLoading(true);
@@ -310,6 +347,43 @@ export function ManageProfileForm({
         >
           Reconnect Google
         </button>
+      </div>
+
+      <div className="space-y-2 rounded-xl border border-zinc-200 p-4 dark:border-zinc-800">
+        <p className="text-sm font-medium text-zinc-800 dark:text-zinc-200">
+          Diagnose Google Health data
+        </p>
+        <p className="text-xs text-zinc-500">
+          Shows what Google&apos;s cloud API returns (not what the phone app
+          displays locally). Useful for Samsung profiles that only show steps.
+        </p>
+        <button
+          type="button"
+          onClick={diagnoseHealthData}
+          disabled={loading || !adminPassword}
+          className="rounded-lg border border-zinc-300 px-3 py-1.5 text-xs font-medium disabled:opacity-60"
+        >
+          Run cloud probe
+        </button>
+        {probeResult && (
+          <div className="space-y-2 text-xs">
+            <ul className="grid gap-1 sm:grid-cols-2">
+              {Object.entries(probeResult.counts).map(([key, value]) => (
+                <li
+                  key={key}
+                  className="rounded bg-zinc-100 px-2 py-1 font-mono dark:bg-zinc-800"
+                >
+                  {key}: {value < 0 ? "error" : value}
+                </li>
+              ))}
+            </ul>
+            {probeResult.notes.map((note) => (
+              <p key={note} className="text-amber-800 dark:text-amber-200">
+                {note}
+              </p>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="space-y-2">

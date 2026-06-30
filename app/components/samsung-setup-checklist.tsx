@@ -10,12 +10,14 @@ export function SamsungSetupChecklist() {
           your phone.
         </li>
         <li>
-          Optional: in Samsung Health → Settings → Health Connect, allow data
-          sharing (helps if you use other Android health apps).
+          In Samsung Health → Settings → Health Connect, turn sync on and allow
+          heart rate, sleep, and SpO₂. Also enable{" "}
+          <strong>Consent to processing of health and wellness data</strong>.
         </li>
         <li>
           Connect your Google account below — same OAuth as Fitbit/Pixel users.
-          Only metrics in your Google Health cloud account will appear here.
+          Only metrics in Google Health <strong>cloud</strong> will appear here
+          (use manage → Run cloud probe to verify).
         </li>
         <li>
           Run <strong>Re-check features</strong> after syncing. Sections without
