@@ -1,6 +1,6 @@
-import { healthFetchForProfile } from "./client";
 import { CACHE_TTL, profileCacheKey, withCache } from "./cache";
 import { queryDateRange, civilDateTimeToString } from "./dates";
+import { listAllReconciledDataPoints } from "./reconcile";
 
 type CivilDateTime = { date?: string | { year?: number; month?: number; day?: number }; time?: string };
 type HealthDate = { year?: number; month?: number; day?: number };
@@ -34,11 +34,6 @@ type DataPoint = {
     lowerBoundPercentage?: number;
     upperBoundPercentage?: number;
   };
-};
-
-type ListResponse = {
-  dataPoints?: DataPoint[];
-  nextPageToken?: string;
 };
 
 export type RestingHeartRateDay = {
@@ -88,31 +83,6 @@ function civilDateToString(c?: CivilDateTime): string | null {
 
 function parseIntField(value?: string): number {
   return value ? parseInt(value, 10) : 0;
-}
-
-async function listAllDataPoints(
-  slug: string,
-  dataType: string,
-  filter: string,
-  pageSize = 100,
-): Promise<DataPoint[]> {
-  const all: DataPoint[] = [];
-  let pageToken: string | undefined;
-
-  do {
-    const params = new URLSearchParams({
-      filter,
-      pageSize: String(pageSize),
-    });
-    if (pageToken) params.set("pageToken", pageToken);
-
-    const path = `/v4/users/me/dataTypes/${dataType}/dataPoints?${params}`;
-    const res = await healthFetchForProfile<ListResponse>(slug, path);
-    all.push(...(res.dataPoints ?? []));
-    pageToken = res.nextPageToken;
-  } while (pageToken);
-
-  return all;
 }
 
 function normalizeRestingHeartRate(
@@ -215,13 +185,21 @@ export async function fetchDashboardData(
 
   const [restingRaw, sleepRaw, spo2Raw] = await Promise.all([
     fetchSafe("daily-resting-heart-rate", () =>
-      listAllDataPoints(slug, "daily-resting-heart-rate", restingFilter),
+      listAllReconciledDataPoints<DataPoint>(
+        slug,
+        "daily-resting-heart-rate",
+        restingFilter,
+      ),
     ),
     fetchSafe("sleep", () =>
-      listAllDataPoints(slug, "sleep", sleepFilter, 25),
+      listAllReconciledDataPoints<DataPoint>(slug, "sleep", sleepFilter, 25),
     ),
     fetchSafe("daily-oxygen-saturation", () =>
-      listAllDataPoints(slug, "daily-oxygen-saturation", spo2Filter),
+      listAllReconciledDataPoints<DataPoint>(
+        slug,
+        "daily-oxygen-saturation",
+        spo2Filter,
+      ),
     ),
   ]);
 
@@ -238,7 +216,7 @@ export function fetchDashboardDataCached(
   days = 7,
 ): Promise<DashboardData> {
   return withCache(
-    profileCacheKey(slug, `dashboard:${days}`),
+    profileCacheKey(slug, `dashboard:reconcile:${days}`),
     CACHE_TTL.dailyMs,
     () => fetchDashboardData(slug, days),
   );

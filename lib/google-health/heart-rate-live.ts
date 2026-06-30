@@ -1,5 +1,6 @@
 import { healthFetchForProfile } from "./client";
 import { CACHE_TTL, profileCacheKey, withCache } from "./cache";
+import { listAllReconciledDataPoints } from "./reconcile";
 import { msUntilLocalMidnight } from "./dates";
 import { bucketSecondsForSpan } from "./downsample";
 import {
@@ -29,11 +30,6 @@ type HeartRatePoint = {
     sampleTime?: { physicalTime?: string };
     beatsPerMinute?: string;
   };
-};
-
-type ListResponse = {
-  dataPoints?: HeartRatePoint[];
-  nextPageToken?: string;
 };
 
 type RollupPoint = {
@@ -178,16 +174,15 @@ async function fetchLatestHeartRate(
   const start = new Date(end.getTime() - 60 * 60 * 1000);
   const filter = `heart_rate.sample_time.physical_time >= "${start.toISOString()}" AND heart_rate.sample_time.physical_time < "${end.toISOString()}"`;
 
-  const res = await healthFetchForProfile<ListResponse>(
+  const points = await listAllReconciledDataPoints<HeartRatePoint>(
     slug,
-    `/v4/users/me/dataTypes/heart-rate/dataPoints?${new URLSearchParams({
-      filter,
-      pageSize: "25",
-    })}`,
+    "heart-rate",
+    filter,
+    25,
   );
 
   let latest: LiveHeartRateSample | null = null;
-  for (const p of res.dataPoints ?? []) {
+  for (const p of points) {
     const hr = p.heartRate;
     if (!hr?.beatsPerMinute || !hr.sampleTime?.physicalTime) continue;
     const bpm = parseInt(hr.beatsPerMinute, 10);
@@ -202,7 +197,7 @@ function fetchLatestHeartRateCached(
   slug: string,
 ): Promise<LiveHeartRateSample | null> {
   return withCache(
-    profileCacheKey(slug, "hr-latest"),
+    profileCacheKey(slug, "hr-latest:reconcile"),
     CACHE_TTL.heartRateLatestMs,
     () => fetchLatestHeartRate(slug, new Date()),
   );
